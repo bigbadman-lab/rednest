@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="184" height="34" viewBox="0 0 184 34" fill="none" role="img" aria-label="RedNest">
+  <g fill="#f50002">
+    <path d="M8 6c0-2.2 1.8-4 4-4h2c3.3 0 6 2.7 6 6v2c0 4.4-3.6 8-8 8h-2v6H6V6h2zm4 8c2.2 0 4-1.8 4-4v-2c0-1.1-.9-2-2-2h-2v8h0z"/>
+    <path d="M17 4l7 10h-3.2L17 8.6 13.2 14H10L17 4z"/>
+  </g>
+  <g fill="#F1F1F3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="600" letter-spacing="0.02em">
+    <text x="36" y="22">RedNest</text>
+  </g>
+</svg>

@@ -243,7 +243,7 @@ const STICKER_PAINTERS: Record<string, StickerPainter> = {
   padlock: sprite("padlock"),
   coffee: sprite("coffee"),
   hazard: sprite("hazard"),
-  zeroday: word("0DAY", "#d7262b", "#fff3dc", "circle"),
+  zeroday: word("0DAY", "#f50002", "#fff3dc", "circle"),
   sudo: word("sudo !!", "#101010", "#3dff8f", "rect"),
   chest: (ctx, size, _fonts, chest) => {
     ctx.fillStyle = "#15100b";
@@ -288,7 +288,7 @@ function chestArt(): Promise<HTMLImageElement | null> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = "/sandchest-icon.svg";
+    img.src = "/rednest-icon.svg";
   });
   return chestImage;
 }
@@ -414,7 +414,7 @@ export async function badgeTexture(profile: HackerProfile, org: string, fonts: F
   ctx.fillStyle = "#15100b";
   ctx.textBaseline = "alphabetic";
   ctx.font = `36px ${fonts.display}`;
-  ctx.fillText("Sandchest", 78, 82);
+  ctx.fillText("RedNest", 78, 82);
   // Photo: a hood and nothing in it.
   ctx.fillStyle = "#1d1a17";
   ctx.fillRect(28, 112, 132, 160);

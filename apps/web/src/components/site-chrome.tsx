@@ -3,7 +3,7 @@
  * and the legal pages so their navigation stays the same. Server components:
  * no JavaScript.
  */
-import { isDraftLegalLink, legal } from "@/lib/legal";
+import { isDraftLegalLink } from "@/lib/legal";
 import { brandAsset, site } from "@/lib/site";
 
 const NAV = [
@@ -50,8 +50,8 @@ type Section = (typeof FOOTER)[number]["links"][number]["id"];
 export function SiteHeader({ current, visitor }: { current?: Section; visitor?: "signed-in" | "signed-out" }) {
   return (
     <header className="site-header">
-      <a href="/" className="wordmark" aria-label="Sandchest home">
-        <img src={brandAsset("/sandchest-logo-dark.svg")} alt="Sandchest" width={138} height={26} />
+      <a href="/" className="wordmark" aria-label="RedNest home">
+        <img src={brandAsset("/red.png")} alt="RedNest" width={148} height={37} />
       </a>
       <nav aria-label="Main" className="header-nav">
         {NAV.map((link) => (
@@ -79,11 +79,15 @@ export function SiteFooter({ current }: { current?: Section }) {
     <footer className="site-footer">
       <div className="footer-top">
         <div className="footer-brand">
-          <a href="/" className="footer-mark" aria-label="Sandchest home">
-            <img src={brandAsset("/sandchest-icon.svg")} alt="" width={46} height={40} />
+          <a href="/" className="footer-mark" aria-label="RedNest home">
+            <img src={brandAsset("/red_white.png")} alt="" width={46} height={46} />
           </a>
-          <p className="footer-tagline">Add a hacker to your team.</p>
+          <p className="footer-tagline">Autonomous AI code security scanning.</p>
           <p className="footer-blurb">Finds real vulnerabilities in your code, and proves them, before attackers do.</p>
+          <a href={site.xUrl} className="footer-social" rel="noreferrer me" target="_blank" aria-label="RedNest on X">
+            <XIcon />
+            <span>@rednestai</span>
+          </a>
         </div>
         <nav aria-label="Footer" className="footer-columns">
           {FOOTER.map((column) => {
@@ -109,17 +113,24 @@ export function SiteFooter({ current }: { current?: Section }) {
       </div>
       <div className="footer-base">
         <p>
-          &copy; {new Date().getFullYear()} {legal.entity}
+          &copy; {new Date().getFullYear()} {site.name}. Open source under AGPL-3.0.
         </p>
         <a href={site.parent.url} className="footer-parent" rel="noreferrer">
-          A <CapLogo className="footer-parent-logo" /> company
+          Built on {site.parent.name}
         </a>
       </div>
     </footer>
   );
 }
 
-/** Cap's logo, as Cap's own site header draws it: the glass mark and wordmark, light for a dark page. */
-function CapLogo({ className }: { className: string }) {
-  return <img className={className} src={brandAsset("/cap-logo.svg")} alt={site.parent.name} width={101} height={40} />;
+/** Official X logo (simple path from X Corp brand guidelines). */
+function XIcon() {
+  return (
+    <svg className="footer-social-icon" viewBox="0 0 24 24" width={16} height={16} aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+      />
+    </svg>
+  );
 }

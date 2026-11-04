@@ -1,4 +1,4 @@
-/** The GitHub accounts Sandchest is installed on: their settings and their hacker. */
+/** The GitHub accounts RedNest is installed on: their settings and their hacker. */
 import { orgRepos, updateOrgSettings } from "@sandchest/db";
 import { z } from "zod";
 import { HOODIES, MAX_STICKERS, PHOSPHORS, readHacker, ROOMS, SHELLS, STICKERS, validHandle, VOICES } from "@/lib/hacker";
@@ -19,7 +19,7 @@ export const accountsOps = [
     name: "list_accounts",
     title: "List accounts",
     description:
-      "Lists the GitHub accounts (personal or organization) Sandchest is installed on that the person can see, with their plan, credits and repositories. Pass refresh=true after the person changes the App's repositories, or wait=50 while they install it: the call returns as soon as the new account shows.",
+      "Lists the GitHub accounts (personal or organization) RedNest is installed on that the person can see, with their plan, credits and repositories. Pass refresh=true after the person changes the App's repositories, or wait=50 while they install it: the call returns as soon as the new account shows.",
     method: "GET",
     path: "/accounts",
     input: z.object({
@@ -78,7 +78,7 @@ export const accountsOps = [
     name: "update_account",
     title: "Change an account's settings",
     description:
-      "Changes an account's settings (admins only). check_threshold: the lowest severity that fails the Sandchest Check on pull requests. email_notifications: email people with access about critical findings and finished deep scans. company: name and billing email for receipts. first_target: the repository to deep scan first once the account joins the plan.",
+      "Changes an account's settings (admins only). check_threshold: the lowest severity that fails the RedNest Check on pull requests. email_notifications: email people with access about critical findings and finished deep scans. company: name and billing email for receipts. first_target: the repository to deep scan first once the account joins the plan.",
     method: "PATCH",
     path: "/accounts/{account}",
     input: z.object({

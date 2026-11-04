@@ -1,9 +1,9 @@
 ---
 title: Self-hosting
-description: Run Sandchest on your own server with Docker Compose, your own GitHub App and your own model endpoint.
+description: Run RedNest on your own server with Docker Compose, your own GitHub App and your own model endpoint.
 ---
 
-Sandchest is open source under the AGPL-3.0. You can run the whole product yourself: the dashboard, pull request reviews, deep scans and fix checks. A self-hosted install has no plans or credits, and sends nothing to us.
+RedNest is open source under the AGPL-3.0. You can run the whole product yourself: the dashboard, pull request reviews, deep scans and fix checks. A self-hosted install has no plans or credits, and sends nothing to us.
 
 The [full guide](https://github.com/CapSoftware/Sandchest/tree/main/docker#readme) on GitHub has troubleshooting, upgrades and backups. This page is the overview.
 
@@ -11,7 +11,7 @@ The [full guide](https://github.com/CapSoftware/Sandchest/tree/main/docker#readm
 
 `docker/compose.yml` starts two containers:
 
-- **web**: the Sandchest server. It serves the dashboard, receives GitHub webhooks and runs scans as durable workflows stored in Postgres. There is no separate worker. The image includes the code indexer for amd64 and arm64.
+- **web**: the RedNest server. It serves the dashboard, receives GitHub webhooks and runs scans as durable workflows stored in Postgres. There is no separate worker. The image includes the code indexer for amd64 and arm64.
 - **postgres**: the database. It isn't published on any port; only `web` can reach it.
 
 Each scan clones its repository with a short-lived, read-only token into a temporary directory, which is deleted when the scan ends.
@@ -31,10 +31,10 @@ Each scan clones its repository with a short-lived, read-only token into a tempo
 3. Get the setup link from the log with `docker compose logs web | grep setup`. While no GitHub App is configured, the server prints a one-time link to `/setup/unlock?token=…` on your address. Without the token, `/setup` shows nothing but a prompt for it.
 4. On the setup page, choose who owns the App and create it on GitHub in one click, through GitHub's app manifest flow. The App's keys are shown once and stored nowhere: copy them into the `GITHUB_…` lines of `docker/.env`.
 5. Restart with `docker compose up -d`. The setup page disappears once the App is configured.
-6. Install the App on your repositories and sign in. Recon builds each repository's threat model first; then every pull request gets a Sandchest Check.
+6. Install the App on your repositories and sign in. Recon builds each repository's threat model first; then every pull request gets a RedNest Check.
 
 ```bash
-cd Sandchest/docker
+cd RedNest/docker
 cp .env.example .env
 docker compose up -d --build
 docker compose logs web | grep setup
@@ -77,7 +77,7 @@ Without billing there are no plans, no credits, and nothing to buy. The limits t
 
 ## Privacy
 
-A self-hosted Sandchest has no telemetry and sends nothing to us. It connects to:
+A self-hosted RedNest has no telemetry and sends nothing to us. It connects to:
 
 - **GitHub**, to read the repositories you installed it on and post reviews.
 - **Your model endpoint**, for the scans themselves.
@@ -89,6 +89,6 @@ Your code, findings and threat models stay on your machine and in your database.
 ## Keeping it safe
 
 - Keep `docker/.env` safe: it holds the App's private key, and anyone who can read it, or the server's log during setup, can get the setup token.
-- Keep Sandchest behind HTTPS. The proxy must pass the original `Host` header.
+- Keep RedNest behind HTTPS. The proxy must pass the original `Host` header.
 - The workflow engine's internal route, under `/.well-known/workflow/`, has no authentication of its own. Only the server itself reaches it, on loopback inside the container: a small gateway in front answers every outside request for it with a 404, however the path is written.
-- Scans read code from repositories you chose, but that code may still be hostile. Sandchest never runs it, and treats everything in it as untrusted.
+- Scans read code from repositories you chose, but that code may still be hostile. RedNest never runs it, and treats everything in it as untrusted.

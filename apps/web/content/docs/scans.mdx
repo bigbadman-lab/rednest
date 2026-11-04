@@ -3,7 +3,7 @@ title: How scans work
 description: Recon, PR reviews, deep scans and fix checks, and what each one does with your code.
 ---
 
-Sandchest runs four kinds of scan. All of them read your code in a temporary workspace that is deleted when the scan ends. None of them run your application, its tests or the proofs of concept they write.
+RedNest runs four kinds of scan. All of them read your code in a temporary workspace that is deleted when the scan ends. None of them run your application, its tests or the proofs of concept they write.
 
 | Scan | Runs when | What it does | Cost |
 | --- | --- | --- | --- |
@@ -18,7 +18,7 @@ Repositories of a million lines of code or more aren't scanned, by any kind of s
 
 ## Recon
 
-Recon runs when Sandchest is installed on a repository, or a repository is added to the installation, once the account has a plan. It maps the repository the way an attacker would before trying anything:
+Recon runs when RedNest is installed on a repository, or a repository is added to the installation, once the account has a plan. It maps the repository the way an attacker would before trying anything:
 
 - entry points: routes, handlers, command-line tools, jobs, queues and webhooks
 - trust boundaries, and how authentication and authorization work
@@ -36,7 +36,7 @@ A pull request is reviewed when it is opened, gets new commits, is reopened, or 
 - pull requests from forks of public repositories, and from outside contributors' forks of private ones (see [below](#pull-requests-from-forks))
 - pull requests on an account with no plan, or out of credits: these get a neutral Check instead
 
-1. Sandchest posts a **Sandchest** Check straight away, showing "Scanning…".
+1. RedNest posts a **RedNest** Check straight away, showing "Scanning…".
 2. It reviews the change in the context of the threat model. A finding has to touch the lines the pull request changed: issues that were already there are left for deep scans.
 3. It completes the Check, and on private repositories posts the findings as review comments.
 
@@ -58,9 +58,9 @@ Each finding is posted as a review comment on the last step of its attack path t
 
 ### Public repositories
 
-On a public repository, Checks and review comments are visible to everyone. So Sandchest posts no review comments and no details: only the Check, with counts by severity and a link to the dashboard.
+On a public repository, Checks and review comments are visible to everyone. So RedNest posts no review comments and no details: only the Check, with counts by severity and a link to the dashboard.
 
-> Sandchest found 1 high-severity issue. View privately →
+> RedNest found 1 high-severity issue. View privately →
 
 The details are only in the dashboard, for people with push access.
 
@@ -71,27 +71,27 @@ The details are only in the dashboard, for people with push access.
 
 The command has to be on a line of its own. Comments from people without write access, and from bots, are ignored.
 
-Sandchest never opens GitHub issues.
+RedNest never opens GitHub issues.
 
 ## Deep scans
 
 A deep scan hunts across the whole repository. It only runs when someone presses **Deep scan** on the repository's page (open it from [Repos](/dashboard/repos)), or **Scan again** on a finished deep scan. Anyone who can push to the repository can start one. The button shows the cost, and a second press confirms it.
 
 - One deep scan runs at a time per repository. Once it finishes you can start another whenever you like: each one costs credits, shown on the button before you confirm.
-- The scan's page shows a live feed of what Sandchest is doing, and findings appear as they survive verification.
+- The scan's page shows a live feed of what RedNest is doing, and findings appear as they survive verification.
 - When it finishes, people with access get an email with what it found, unless an admin has turned emails off.
 
 ## Fix checks
 
-When you push to the default branch, Sandchest checks the repository's open findings whose cited files that push changed. Other open findings aren't touched. Each one is checked again on the new code:
+When you push to the default branch, RedNest checks the repository's open findings whose cited files that push changed. Other open findings aren't touched. Each one is checked again on the new code:
 
 - Each step of the attack path is found again by its code, so findings follow code that moved.
 - If the attack path is gone, the finding is marked **fixed**, and its code excerpts are deleted.
-- If the cited code can no longer be found, the finding stays open and is marked **Code moved**. The mark clears when a later scan finds the same finding again. Sandchest never closes a finding just because it lost track of the code.
+- If the cited code can no longer be found, the finding stays open and is marked **Code moved**. The mark clears when a later scan finds the same finding again. RedNest never closes a finding just because it lost track of the code.
 
 Fix checks are free, while the account has at least one credit left.
 
-## How Sandchest finds vulnerabilities
+## How RedNest finds vulnerabilities
 
 PR reviews and deep scans run the same pipeline:
 

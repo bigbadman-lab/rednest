@@ -9,10 +9,9 @@
  *   icon-maskable-512.png          Android's adaptive icon, inside its safe circle
  *   social-avatar.png              1024, a profile picture for social and community accounts
  *
- * Small sizes use the 15 × 14 chest (`sandchest-icon-small.svg`), the rest the
- * 23 × 20 one (`sandchest-icon.svg`). Each is scaled by a whole number, so
- * every art pixel stays a sharp square. Favicons are transparent; the rest sit
- * on the page background inside the chest's dithered glow, like the hero.
+ * Small sizes use `rednest-icon-small.svg`, the rest `rednest-icon.svg`.
+ * Each is scaled by a whole number so art pixels stay sharp. Favicons are
+ * transparent; the rest sit on the page background with a dithered glow.
  * Run after changing the art, then bump BRAND_VERSION in `src/lib/site.ts`:
  *
  *   bun run icons
@@ -26,7 +25,7 @@ import { bayer, LIGHT_RAMP } from "../src/lib/chest-dither";
 const publicDir = join(import.meta.dirname, "..", "public");
 
 type Rgb = readonly [number, number, number];
-const BACKGROUND: Rgb = [0x0d, 0x0a, 0x07];
+const BACKGROUND: Rgb = [0x0a, 0x0a, 0x0b];
 
 interface Art {
   width: number;
@@ -42,8 +41,8 @@ function loadArt(file: string): Art {
   return { width: image.width, height: image.height, pixels: image.pixels };
 }
 
-const small = loadArt("sandchest-icon-small.svg");
-const large = loadArt("sandchest-icon.svg");
+const small = loadArt("rednest-icon-small.svg");
+const large = loadArt("rednest-icon.svg");
 
 interface Icon {
   file: string;

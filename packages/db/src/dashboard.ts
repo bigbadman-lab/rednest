@@ -5,7 +5,7 @@
  */
 import { and, desc, eq, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "./client";
-import { accounts, sessions, findingEvents, findings, orgAdmins, orgBilling, orgs, permissionCache, repos, scanEvents, scanMetrics, scans, users, type OrgSettings } from "./schema";
+import { accounts, sessions, findingEvents, findings, orgAdmins, orgBilling, orgSponsors, orgs, permissionCache, repos, scanEvents, scanMetrics, scans, users, type OrgSettings } from "./schema";
 
 type Severity = "critical" | "high" | "medium" | "low";
 export type RepoPermission = (typeof permissionCache.$inferSelect)["permission"];
@@ -85,7 +85,11 @@ export async function githubAccountRowId(database: Db, userId: string): Promise<
   return row?.id;
 }
 
-const canSee = (userId: string) => sql`exists (select 1 from ${permissionCache} pc where pc.user_id = ${userId} and pc.repo_id = ${repos.id})`;
+/** Installed-repo push access, or ownership of a Quick Scan target. */
+const canSee = (userId: string) => sql`(
+  exists (select 1 from ${permissionCache} pc where pc.user_id = ${userId} and pc.repo_id = ${repos.id})
+  or (${repos.source} = 'quick_scan' and ${repos.ownerUserId} = ${userId})
+)`;
 
 // ---- Repos screen ----------------------------------------------------------
 
@@ -753,6 +757,8 @@ export interface SettingsOrg {
   admin: boolean;
   /** The org's billing as last read from Autumn; null if never read. */
   billing: typeof orgBilling.$inferSelect | null;
+  /** Whether an accepted scan sponsor exists for automatic and lifecycle scans. */
+  sponsored: boolean;
   repos: Array<{ id: string; fullName: string; private: boolean }>;
 }
 
@@ -760,27 +766,51 @@ export interface SettingsOrg {
 export async function settingsOrgs(database: Db, userId: string): Promise<SettingsOrg[]> {
   const [visible, admin] = await Promise.all([
     database
-      .select({ org: orgs, billing: orgBilling, repo: { id: repos.id, fullName: repos.fullName, private: repos.private } })
+      .select({
+        org: orgs,
+        billing: orgBilling,
+        sponsorOrgId: orgSponsors.orgId,
+        repo: { id: repos.id, fullName: repos.fullName, private: repos.private },
+      })
       .from(repos)
       .innerJoin(orgs, eq(orgs.id, repos.orgId))
       .leftJoin(orgBilling, eq(orgBilling.orgId, orgs.id))
+      .leftJoin(orgSponsors, eq(orgSponsors.orgId, orgs.id))
       .where(and(eq(repos.enabled, true), canSee(userId)))
       .orderBy(repos.fullName),
     database
-      .select({ org: orgs, billing: orgBilling })
+      .select({ org: orgs, billing: orgBilling, sponsorOrgId: orgSponsors.orgId })
       .from(orgAdmins)
       .innerJoin(orgs, eq(orgs.id, orgAdmins.orgId))
       .leftJoin(orgBilling, eq(orgBilling.orgId, orgs.id))
+      .leftJoin(orgSponsors, eq(orgSponsors.orgId, orgs.id))
       .where(eq(orgAdmins.userId, userId)),
   ]);
   const byId = new Map<string, SettingsOrg>();
-  const add = (org: typeof orgs.$inferSelect, billing: typeof orgBilling.$inferSelect | null) => {
+  const add = (org: typeof orgs.$inferSelect, billing: typeof orgBilling.$inferSelect | null, sponsored: boolean) => {
     let entry = byId.get(org.id);
-    if (!entry) byId.set(org.id, (entry = { id: org.id, login: org.githubLogin, type: org.type, installationId: org.installationId, settings: org.settings, admin: false, billing, repos: [] }));
+    if (!entry) {
+      byId.set(
+        org.id,
+        (entry = {
+          id: org.id,
+          login: org.githubLogin,
+          type: org.type,
+          installationId: org.installationId,
+          settings: org.settings,
+          admin: false,
+          billing,
+          sponsored,
+          repos: [],
+        }),
+      );
+    } else if (sponsored) {
+      entry.sponsored = true;
+    }
     return entry;
   };
-  for (const { org, billing } of admin) add(org, billing).admin = true;
-  for (const { org, billing, repo } of visible) add(org, billing).repos.push(repo);
+  for (const { org, billing, sponsorOrgId } of admin) add(org, billing, !!sponsorOrgId).admin = true;
+  for (const { org, billing, sponsorOrgId, repo } of visible) add(org, billing, !!sponsorOrgId).repos.push(repo);
   return [...byId.values()].filter((org) => org.installationId !== null).sort((a, b) => a.login.localeCompare(b.login));
 }
 

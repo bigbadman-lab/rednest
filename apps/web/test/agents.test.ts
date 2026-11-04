@@ -377,22 +377,14 @@ describe.skipIf(!available)("REST API", () => {
     expect((await api(bobKey, "GET", "/accounts/acme")).body.settings.company).toBeNull();
   });
 
-  test("billing: no plan refuses deep scans; free credits; a first purchase needs Stripe, then the card is charged", async () => {
-    const refused = await api(aliceKey, "POST", "/repos/acme/api/scans");
-    expect(refused.status).toBe(402);
-    expect(refused.body.error.code).toBe("no_plan");
-
+  test("billing: Dig uses RedNest free entitlement; free credits claim; purchase needs Stripe then charges the card", async () => {
     const billing = (await api(aliceKey, "GET", "/accounts/acme/billing")).body;
     expect(billing).toMatchObject({ plan: null, card_on_file: false, free_credits: { open: true, credits: 20 } });
     expect((await api(bobKey, "POST", "/accounts/acme/billing/claim")).body.error.code).toBe("not_admin");
     expect((await api(aliceKey, "PUT", "/accounts/acme/billing/auto-top-up", { enabled: true })).body.error.code).toBe("needs_paid_plan");
 
-    const claimed = await api(aliceKey, "POST", "/accounts/acme/billing/claim");
-    expect(claimed.body).toMatchObject({ status: "claimed", credits: 20, plan: { id: "trial" } });
-    // Claiming again (a retry) is harmless: still claimed, nothing granted twice.
-    expect((await api(aliceKey, "POST", "/accounts/acme/billing/claim")).body).toMatchObject({ status: "claimed", credits: 20 });
-
-    // The first deep scan is free; a second one of the same repo while it runs is refused.
+    // Without an Autumn plan, Dig still uses the lifetime free RedNest entitlement (not no_plan).
+    await database.$client`update scans set status = 'completed' where repo_id = ${ids.api} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
     const scan = await api(aliceKey, "POST", "/repos/acme/api/scans");
     expect(scan.status).toBe(202);
     expect(scan.body.scan).toMatchObject({ kind: "deep", repo: { full_name: "acme/api" }, done: false });
@@ -400,15 +392,21 @@ describe.skipIf(!available)("REST API", () => {
     const again = await api(aliceKey, "POST", "/repos/acme/api/scans");
     expect(again.body.error).toMatchObject({ code: "already_running", scan_id: scan.body.scan.id });
 
-    // Following it: get_scan waits, and returns as soon as it is done.
     await database.$client`update scans set status = 'completed', finished_at = now() where id = ${scan.body.scan.id}`;
+    // Free entitlement is consumed: further Digs are blocked until holder access exists.
+    const blocked = await api(aliceKey, "POST", "/repos/acme/secret/scans");
+    expect(blocked.status).toBe(402);
+    expect(blocked.body.error.code).toBe("holder_inactive");
+
     const waited = Date.now();
     expect((await api(aliceKey, "GET", `/scans/${scan.body.scan.id}?wait=5`)).body).toMatchObject({ status: "completed", done: true });
     expect(Date.now() - waited).toBeLessThan(2_000);
-    const events = (await api(aliceKey, "GET", `/scans/${scan.body.scan.id}/events?after=0`)).body;
-    expect(events.done).toBe(true);
     expect((await api(bobKey, "GET", `/scans/${scan.body.scan.id}`)).status).toBe(200);
     expect((await api(aliceKey, "GET", "/scans?kind=deep")).body.scans[0].id).toBe(scan.body.scan.id);
+
+    const claimed = await api(aliceKey, "POST", "/accounts/acme/billing/claim");
+    expect(claimed.body).toMatchObject({ status: "claimed", credits: 20, plan: { id: "trial" } });
+    expect((await api(aliceKey, "POST", "/accounts/acme/billing/claim")).body).toMatchObject({ status: "claimed", credits: 20 });
 
     // On free credits, buying joins the plan through Stripe Checkout.
     const quote = (await api(aliceKey, "POST", "/accounts/acme/billing/quote", { credits: 25 })).body;
@@ -418,7 +416,6 @@ describe.skipIf(!available)("REST API", () => {
     const checkout = (await api(aliceKey, "POST", "/accounts/acme/billing/purchase", { credits: 25 })).body;
     expect(checkout).toMatchObject({ status: "checkout_required", checkout_url: expect.stringContaining("checkout.test") });
 
-    // With the card on file, credits are charged at once.
     const charged = (await api(aliceKey, "POST", "/accounts/acme/billing/purchase", { credits: 10 })).body;
     expect(charged.status).toBe("charged");
     const auto = (await api(aliceKey, "PUT", "/accounts/acme/billing/auto-top-up", { enabled: true, credits: 10, monthly_limit_usd: 60 })).body;

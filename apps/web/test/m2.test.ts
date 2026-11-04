@@ -313,7 +313,7 @@ describe.skipIf(!available)("GitHub App, end to end", () => {
     expect(recorded.reviews.length).toBe(reviews);
     const check = recorded.completed.at(-1)!;
     expect(check.conclusion).toBe("failure");
-    expect(check.summary).toContain("Sandchest found 1 high-severity issue.");
+    expect(check.summary).toContain("RedNest found 1 high-severity issue.");
     expect(JSON.stringify(check)).not.toContain("app.js");
   }, 60_000);
 

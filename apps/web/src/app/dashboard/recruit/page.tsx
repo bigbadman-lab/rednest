@@ -10,10 +10,10 @@ import { claimIntent } from "@/server/free-credits";
 import { liveStats } from "@/server/stats";
 import "../../rig.css";
 
-export const metadata: Metadata = { title: "Recruit your hacker · Sandchest" };
+export const metadata: Metadata = { title: "Recruit your hacker · RedNest" };
 
 /**
- * Setting up Sandchest, from GitHub to joining: connect an account, say
+ * Setting up RedNest, from GitHub to joining: connect an account, say
  * who the company is and where to look first, recruit the hacker, then add
  * credits and pay (or, for someone who came to claim them, take free
  * credits). `?org=` opens it on an account already connected.

@@ -1,4 +1,5 @@
 import type { ScanFilters, ScanListItem } from "@sandchest/db";
+import type { ReactNode } from "react";
 import { AutoSubmitSelect } from "@/components/app/auto-submit";
 import { HoverLink, Link } from "@/components/app/hover-link";
 import { ScanRows } from "@/components/app/scan-rows";
@@ -41,7 +42,17 @@ function href(current: ReturnType<typeof parse>, change: Partial<ReturnType<type
 }
 
 /** The scans list, drawn from what the page read; its loading state draws it from sample scans. */
-export function ScansView({ current, list, repos }: { current: ReturnType<typeof parse>; list: ScanListItem[]; repos: Array<{ id: string; fullName: string }> }) {
+export function ScansView({
+  current,
+  list,
+  repos,
+  quickScan,
+}: {
+  current: ReturnType<typeof parse>;
+  list: ScanListItem[];
+  repos: Array<{ id: string; fullName: string }>;
+  quickScan?: ReactNode;
+}) {
   const filtered = current.kind !== undefined || current.repo !== undefined;
   const last = list.at(-1);
 
@@ -50,9 +61,11 @@ export function ScansView({ current, list, repos }: { current: ReturnType<typeof
       <div className="page-head">
         <div>
           <h1 className="page-title">Scans</h1>
-          <p className="page-sub">Every review, deep scan, fix check and recon, newest first. Open one to see what it read and found.</p>
+          <p className="page-sub">Every review, deep scan, fix check and recon, newest first. Open one to see what it read and found. Paste a public GitHub URL below to Quick Scan without installing the App.</p>
         </div>
       </div>
+
+      {quickScan}
 
       <div className="filters">
         <nav className="tabs" aria-label="Kind">

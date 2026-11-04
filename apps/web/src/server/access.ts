@@ -115,7 +115,7 @@ export function refreshAccess(userId: string, http?: HttpOptions): Promise<void>
 
 /** The part of a refresh after the token: GitHub → database. Exposed for tests. */
 export async function storeAccess(userId: string, token: string, http?: HttpOptions): Promise<void> {
-  // Only installations Sandchest has recorded matter; unknown ones cost no further requests.
+  // Only installations RedNest has recorded matter; unknown ones cost no further requests.
   const known = new Map<number, string>();
   const access = await readUserAccess(token, {
     http,
@@ -134,9 +134,11 @@ export async function storeAccess(userId: string, token: string, http?: HttpOpti
   const installations = access.installations.filter((i) => known.has(i.installationId));
   const visible = installations.flatMap((i) => i.repos.filter((repo) => VISIBLE.has(repo.role)));
   const repoIds = await repoIdsByGithubId(db(), visible.map((repo) => repo.id));
+  const adminOrgIds = installations.filter((i) => i.admin).map((i) => known.get(i.installationId)!);
   await replaceAccess(db(), userId, {
     repos: visible.flatMap((repo) => (repoIds.has(repo.id) ? [{ repoId: repoIds.get(repo.id)!, permission: repo.role as RepoPermission }] : [])),
-    adminOrgIds: installations.filter((i) => i.admin).map((i) => known.get(i.installationId)!),
+    adminOrgIds,
     github: { id: access.userId, login: access.login },
   });
+
 }

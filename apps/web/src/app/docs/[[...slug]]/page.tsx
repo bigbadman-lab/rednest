@@ -4,7 +4,7 @@ import { CopyMarkdown } from "@/components/docs/copy";
 import { mdxComponents } from "@/components/docs/mdx";
 import { DocsShell } from "@/components/docs/shell";
 import { docsInOrder, docsParams, getDocsPage, markdownUrl } from "@/lib/docs";
-import { site, socialImage, socialVideo } from "@/lib/site";
+import { site, socialImage } from "@/lib/site";
 
 // Every docs page is built ahead of time; anything else is a 404.
 export const dynamicParams = false;
@@ -31,7 +31,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: site.name,
       type: "website",
       images: [socialImage],
-      videos: [socialVideo],
     },
   };
 }

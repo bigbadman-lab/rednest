@@ -1,5 +1,5 @@
 /**
- * An example Sandchest pull request review comment.
+ * An example RedNest pull request review comment.
  *
  * Illustrative only: never paste real scan output here (see AGENTS.md).
  */
@@ -78,14 +78,14 @@ export function FindingStrip() {
         <div className="comment">
           <img
             className="comment-avatar"
-            src={brandAsset("/sandchest-icon-small.svg")}
+            src={brandAsset("/rednest-icon-small.svg")}
             alt=""
             width={30}
             height={28}
           />
           <div className="comment-main">
             <p className="comment-meta">
-              <strong>sandchest</strong>
+              <strong>rednest</strong>
               <span className="bot-badge">bot</span>
               <span className="text-dust">commented on lines 14–15</span>
             </p>
@@ -137,7 +137,7 @@ export function FindingStrip() {
           ✕
         </span>
         <span>
-          <strong>Sandchest</strong> <span className="text-dust">found 1 high-severity issue</span>
+          <strong>RedNest</strong> <span className="text-dust">found 1 high-severity issue</span>
         </span>
         <span className="check-cost">Reviewed · 2 credits</span>
       </div>

@@ -25,8 +25,8 @@ export function LandingPage({ visitor }: { visitor: Visitor }) {
             Add a hacker to your team.
           </h1>
           <p className="hero-lede">
-            Sandchest acts like a real hacker embedded in your team, using abliterated,
-            unrestricted models to find real vulnerabilities in your code before attackers do.
+            RedNest connects to your GitHub repositories, runs automated security scans, and
+            delivers actionable vulnerability findings with attack paths and fix guidance.
           </p>
           <div className="hero-actions">
             <HeroKey href={visitor === "signed-in" ? site.links.dashboard : site.links.getStarted} track="hero-get-started">Get started</HeroKey>
@@ -52,8 +52,8 @@ export function LandingPage({ visitor }: { visitor: Visitor }) {
             Find the exploit before someone else does
           </h2>
           <p className="pitch-body">
-            Attackers already use abliterated models to scan code for holes. Sandchest runs the
-            same models on your repos and sends you what it finds. Every finding comes with:
+            RedNest monitors repositories, discovers real vulnerabilities, and reports what it
+            can prove. Every finding comes with:
           </p>
           <ul className="pitch-list">
             <li>The attack path, step by step, with file and line</li>

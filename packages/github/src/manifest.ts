@@ -62,7 +62,7 @@ export const APP_NAME_MAX = 34;
 export function buildManifest(input: ManifestInput): Manifest {
   const base = trimSlash(input.appUrl);
   return {
-    name: input.name.trim().slice(0, APP_NAME_MAX) || "Sandchest",
+    name: input.name.trim().slice(0, APP_NAME_MAX) || "RedNest",
     url: base,
     description: "Reads your code the way an attacker would and reviews pull requests for exploitable vulnerabilities.",
     hook_attributes: { url: `${base}/api/github/webhooks`, active: true },

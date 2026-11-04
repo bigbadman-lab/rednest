@@ -103,7 +103,7 @@ describe("markdown report", () => {
       ...context,
       filters: { status: "open", severities: ["critical", "high"], repo: "repo-id", includeLowConfidence: true },
     });
-    expect(report).toStartWith("# Sandchest findings\n\n2 open findings · Critical, High · acme/api · low confidence included. Exported 3 Nov 2026.");
+    expect(report).toStartWith("# RedNest findings\n\n2 open findings · Critical, High · acme/api · low confidence included. Exported 3 Nov 2026.");
     expect(report).toContain("| 1 | Critical | [Pipe \\| title](https://sandchest.test/dashboard/findings/a) | acme/api | `db/invoices.ts:12` |");
     expect(report).toContain("**Critical** · high confidence");
     expect(report).toContain("Dismissed: false positive");

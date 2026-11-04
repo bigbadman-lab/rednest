@@ -242,7 +242,7 @@ function Paywall({ repo }: { repo: DashboardRepo }) {
         Recruit a hacker for {repo.orgLogin}
       </h2>
       <p className="field-help">
-        Sandchest maps each repository and reviews every pull request once {repo.orgLogin} joins: {PRICES.plan} {PRICES.review} Your first deep scan is free.
+        RedNest maps each repository and reviews every pull request once {repo.orgLogin} joins: {PRICES.plan} {PRICES.review} Your first deep scan is free.
         {!repo.orgAdmin && ` Only an admin of ${repo.orgLogin} can join.`}
       </p>
       {repo.orgAdmin && (

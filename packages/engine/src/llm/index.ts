@@ -1,5 +1,5 @@
 export { createLlmClient, type LlmClient, type LlmClientOptions } from "./client";
-export { loadLlmConfig, ROLE_REASONING, type LlmConfig } from "./config";
+export { loadLlmConfig, ROLE_REASONING, modelSupportsReasoningEffort, type LlmConfig } from "./config";
 export {
   createClassifier,
   loadClassifierConfig,

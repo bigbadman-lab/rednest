@@ -182,19 +182,26 @@ export async function hasPlan(org: BillingOrg): Promise<boolean> {
 }
 
 /**
- * Whether the org may scan at all: an active plan and credits left, trusting
- * a copy up to five minutes old. What recon on a new install or repository
- * waits for.
+ * Legacy Autumn gate: plan and credits. When Autumn is off this never grants
+ * hosted scan access — RedNest entitlements / org sponsorship decide that.
+ * Live webhooks use `orgLifecycleAllowed` via `rednestWebhookDeps`; keep this
+ * fail-closed so missing `AUTUMN_SECRET_KEY` cannot unlock scans.
  */
 export async function canScan(org: BillingOrg): Promise<boolean> {
-  if (!billingEnabled()) return true;
+  if (!billingEnabled()) {
+    const { orgLifecycleAllowed } = await import("./entitlements");
+    return orgLifecycleAllowed(org.id);
+  }
   const stored = await orgBillingRow(db(), org.id);
   const state = stored && Date.now() - stored.checkedAt.getTime() < PLAN_TTL_MS ? stored : await syncBilling(org);
   return state.planId !== null && state.credits > 0;
 }
 
-/** Queues and starts recon on repositories that have none, once an org has a plan. */
+/** Queues and starts recon on repositories that have none, once an org may run lifecycle scans. */
 export async function startPendingRecon(orgId: string): Promise<string[]> {
+  // RedNest: recon requires an accepted sponsor; Autumn plan activation alone must not unlock scans.
+  const { orgLifecycleAllowed } = await import("./entitlements");
+  if (!(await orgLifecycleAllowed(orgId))) return [];
   const ids = await queuePendingRecons(db(), orgId);
   if (ids.length === 0) return ids;
   // Loaded on demand: pages that sync billing never trace the workflow runtime.

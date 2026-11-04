@@ -1,24 +1,87 @@
-/** Manual deep scans ("Dig"): one at a time per repo, as often as the org's credits allow (SPEC §4). */
+/** Manual deep scans ("Dig"): one at a time per repo, authorized by RedNest entitlements. */
 import { randomUUID } from "node:crypto";
-import { DEEP_SCAN_TIERS } from "@sandchest/billing";
-import { activeDeepScan, claimFreeDig, createScan, deleteUnstartedScan, type Org, type Repo } from "@sandchest/db";
+import { activeDeepScan, createScan, deleteUnstartedScan, pendingRecon, type Org, type Repo } from "@sandchest/db";
 import { digState } from "@/lib/dig-state";
-import { autumn, reserveScan } from "./billing";
+import {
+  authorizeChargeableScan,
+  authorizeOperatorScan,
+  EntitlementError,
+  manualDeepBlockedByUnsponsoredRecon,
+  releaseUnusedScanEntitlement,
+} from "./entitlements";
 import { describeError } from "./log";
 import { db, githubApp } from "./services";
 import { startScan } from "./start";
 
 export type DigResult =
   | { ok: true; scanId: string }
-  | { ok: false; reason: "not_installed" | "running" | "too_large" | "no_plan" | "out_of_credits"; scanId?: string; credits?: number };
+  | {
+      ok: false;
+      reason:
+        | "not_installed"
+        | "running"
+        | "too_large"
+        | "no_plan"
+        | "out_of_credits"
+        | "holder_inactive"
+        | "wallet_required"
+        | "insufficient_red"
+        | "quota_exhausted"
+        | "free_used"
+        | "auth_required"
+        | "no_sponsor";
+      scanId?: string;
+      credits?: number;
+    };
 
 /**
- * Starts a deep scan of a repo the caller is allowed to scan. Its credits are
- * held before the scan exists, so a refusal leaves nothing behind and the
- * person hears about it at once.
+ * Starts a deep scan for a signed-in user. Reserves RedNest entitlements before
+ * the workflow starts. Does not accept an operator exemption — use
+ * {@link requestOperatorDeepScan} after the admin-token check.
  */
-/** `operator`: started with the admin token, not by the org. It never uses the org's free first Dig. */
-export async function requestDeepScan(repo: Repo & { org: Org }, trigger: "manual" = "manual", options: { operator?: boolean } = {}): Promise<DigResult> {
+export async function requestDeepScan(
+  repo: Repo & { org: Org },
+  trigger: "manual" = "manual",
+  options: { ownerUserId: string },
+): Promise<DigResult> {
+  if (!repo.enabled || !repo.org.installationId) return { ok: false, reason: "not_installed" };
+  const active = await activeDeepScan(db(), repo.id);
+  const state = digState({ loc: repo.loc, activeDeepScanId: active?.id ?? null });
+  if (state.state === "running") return { ok: false, reason: "running", scanId: state.scanId };
+  if (state.state === "too_large") return { ok: false, reason: "too_large" };
+
+  // Before reserving quota: pending recon cannot start without a sponsor.
+  if (await manualDeepBlockedByUnsponsoredRecon(repo.id, repo.orgId)) {
+    return { ok: false, reason: "no_sponsor" };
+  }
+
+  const headSha = await githubApp().installation(repo.org.installationId).branchSha(repo.fullName, repo.defaultBranch);
+
+  const { scan, created } = await createScan(db(), { id: randomUUID(), repoId: repo.id, orgId: repo.orgId, kind: "deep", trigger, headSha });
+  if (!created) return { ok: false, reason: "running", scanId: scan.id };
+
+  try {
+    await authorizeChargeableScan({ scanId: scan.id, ownerUserId: options.ownerUserId });
+  } catch (error) {
+    await releaseUnusedScanEntitlement(scan.id).catch(() => {});
+    await deleteUnstartedScan(db(), scan.id);
+    if (error instanceof EntitlementError) {
+      return { ok: false, reason: mapEntitlementReason(error.code) };
+    }
+    throw error;
+  }
+
+  await startScan(scan.id).catch((error: unknown) => console.error(`Starting deep scan ${scan.id} failed: ${describeError(error)}`));
+  return { ok: true, scanId: scan.id };
+}
+
+/**
+ * Operator Dig after `isOperator(request)`. Exempt from user free/monthly quotas.
+ * Persists a server-controlled operator authorization row (survives workflow retries).
+ * If the repo has pending recon, authorizes and starts that single recon so the deep
+ * scan is not stuck waiting for an unsponsored lifecycle path.
+ */
+export async function requestOperatorDeepScan(repo: Repo & { org: Org }, trigger: "manual" = "manual"): Promise<DigResult> {
   if (!repo.enabled || !repo.org.installationId) return { ok: false, reason: "not_installed" };
   const active = await activeDeepScan(db(), repo.id);
   const state = digState({ loc: repo.loc, activeDeepScanId: active?.id ?? null });
@@ -27,33 +90,42 @@ export async function requestDeepScan(repo: Repo & { org: Org }, trigger: "manua
 
   const headSha = await githubApp().installation(repo.org.installationId).branchSha(repo.fullName, repo.defaultBranch);
 
-  // Claim the repo's one deep-scan slot before holding any credits, so a second
-  // Dig that loses the race never reaches Autumn: no hold, no auto top-up, no
-  // low-credit email from a scan that never runs.
   const { scan, created } = await createScan(db(), { id: randomUUID(), repoId: repo.id, orgId: repo.orgId, kind: "deep", trigger, headSha });
   if (!created) return { ok: false, reason: "running", scanId: scan.id };
 
-  let gate: Awaited<ReturnType<typeof reserveScan>>;
-  let credits = 0;
   try {
-    // An org's first Dig is free (it still needs a plan). Otherwise a repo recon has not sized yet holds the
-    // most a deep scan can cost, and is charged what the scan measures (never more than it held).
-    // Inside the try: a failure here cleans up like any other, and never leaves a scan to be charged later.
-    const free = !options.operator && (await claimFreeDig(db(), repo.orgId, scan.id));
-    credits = free ? 0 : (state.credits ?? DEEP_SCAN_TIERS.at(-1)!.credits);
-    gate = await reserveScan(scan.id, { id: repo.org.id, githubLogin: repo.org.githubLogin }, credits);
+    await authorizeOperatorScan(scan.id);
+    const reconId = await pendingRecon(db(), repo.id);
+    if (reconId) {
+      await authorizeOperatorScan(reconId);
+      await startScan(reconId).catch((error: unknown) => console.error(`Starting operator recon ${reconId} failed: ${describeError(error)}`));
+    }
   } catch (error) {
-    // Give back anything Autumn may hold, and the slot.
-    await autumn()?.finalize({ customerId: repo.org.id, lockId: scan.id, action: "release" }).catch(() => {});
     await deleteUnstartedScan(db(), scan.id);
     throw error;
   }
-  if (!gate.ok) {
-    // Refused: the scan never started, so it leaves nothing behind (a free Dig it claimed is free again).
-    await deleteUnstartedScan(db(), scan.id);
-    return { ok: false, reason: gate.reason, credits };
-  }
-  // If this start fails, the stranded-scan sweep starts it within minutes: the credits stay held for it.
+
   await startScan(scan.id).catch((error: unknown) => console.error(`Starting deep scan ${scan.id} failed: ${describeError(error)}`));
   return { ok: true, scanId: scan.id };
+}
+
+function mapEntitlementReason(code: EntitlementError["code"]): Exclude<DigResult & { ok: false }, { ok: true }>["reason"] {
+  switch (code) {
+    case "holder_inactive":
+      return "holder_inactive";
+    case "wallet_required":
+      return "wallet_required";
+    case "insufficient_red":
+      return "insufficient_red";
+    case "quota_exhausted":
+      return "quota_exhausted";
+    case "free_used":
+      return "free_used";
+    case "auth_required":
+      return "auth_required";
+    case "no_sponsor":
+      return "no_sponsor";
+    default:
+      return "holder_inactive";
+  }
 }

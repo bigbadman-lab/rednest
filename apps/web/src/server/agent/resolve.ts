@@ -19,7 +19,7 @@ export async function resolveAccount(context: Context, ref: string): Promise<Set
   const wanted = ref.toLowerCase();
   const account = accounts.find((org) => (isUuid(ref) ? org.id === wanted : org.login.toLowerCase() === wanted));
   if (!account) {
-    throw new ApiError(404, "account_not_found", `Sandchest isn't installed on a GitHub account called "${ref}" that you can see. Call list_accounts to see the accounts, or install the GitHub App first.`);
+    throw new ApiError(404, "account_not_found", `RedNest isn't installed on a GitHub account called "${ref}" that you can see. Call list_accounts to see the accounts, or install the GitHub App first.`);
   }
   return account;
 }
@@ -50,7 +50,7 @@ const repoNotFound = (ref: string) =>
   new ApiError(
     404,
     "repo_not_found",
-    `No repository "${ref}" that you can see. Sandchest shows repositories where its GitHub App is installed and you have push access. Call list_repos to see them.`,
+    `No repository "${ref}" that you can see. RedNest shows repositories where its GitHub App is installed and you have push access. Call list_repos to see them.`,
   );
 
 export { notFound };

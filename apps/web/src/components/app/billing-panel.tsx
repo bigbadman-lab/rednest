@@ -18,7 +18,7 @@ export function BillingPanel({ org, billing }: { org: { id: string; login: strin
         <p className="field-legend">Plan</p>
         <p className="field-help">
           {billing?.credits ? `${plural(billing.credits, "credit")} left, but no plan. ` : ""}
-          Sandchest starts scanning {org.login}’s repositories once it joins the plan: {PRICES.plan} {PRICE_NOTE}
+          RedNest starts scanning {org.login}’s repositories once it joins the plan: {PRICES.plan} {PRICE_NOTE}
           {!org.admin && " Only an admin of this account can join."}
         </p>
         {org.admin && (
@@ -48,8 +48,8 @@ export function BillingPanel({ org, billing }: { org: { id: string; login: strin
           </p>
           <p className={out ? "form-error" : "field-help"} role={out ? "alert" : undefined}>
             {out
-              ? `The free credits are spent, so Sandchest has stopped scanning ${org.login}. Join ${PLAN.name} to keep going.`
-              : `When they run out, Sandchest stops scanning until ${org.login} joins ${PLAN.name}. Credits left over carry across.`}
+              ? `The free credits are spent, so RedNest has stopped scanning ${org.login}. Join ${PLAN.name} to keep going.`
+              : `When they run out, RedNest stops scanning until ${org.login} joins ${PLAN.name}. Credits left over carry across.`}
           </p>
         </div>
         <div>

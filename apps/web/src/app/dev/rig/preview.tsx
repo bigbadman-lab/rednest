@@ -40,7 +40,7 @@ const BRIEFING = {
   orgId: ACCOUNTS[0]!.id,
   login: "acme",
   type: "Organization" as const,
-  profile: { name: "Acme", about: "Storefronts and payments for small shops.", website: "https://example.com/", location: "Somewhere, Earth", avatar: "/sandchest-icon.svg" },
+  profile: { name: "Acme", about: "Storefronts and payments for small shops.", website: "https://example.com/", location: "Somewhere, Earth", avatar: "/rednest-icon.svg" },
   repos: [
     { id: "00000000-0000-4000-8000-0000000000a1", fullName: "acme/storefront", private: true, loc: 212_000, language: "TypeScript", description: null },
     { id: "00000000-0000-4000-8000-0000000000a2", fullName: "acme/payments-api", private: true, loc: 48_000, language: "Go", description: null },

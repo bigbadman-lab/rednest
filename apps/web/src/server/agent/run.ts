@@ -54,7 +54,7 @@ export async function authenticate(request: Request, options: { freshAccess?: bo
   const match = /^Bearer\s+(\S+)\s*$/i.exec(request.headers.get("authorization") ?? "");
   if (!match) throw unauthorized("unauthorized", "Send an API key as `Authorization: Bearer <key>`.");
   const token = match[1]!;
-  if (!token.startsWith(PREFIX.key) && !token.startsWith(PREFIX.access)) throw unauthorized("invalid_token", "That isn't a Sandchest API key or access token.");
+  if (!token.startsWith(PREFIX.key) && !token.startsWith(PREFIX.access)) throw unauthorized("invalid_token", "That isn't a RedNest API key or access token.");
   const found = await tokenPrincipal(db(), sha256(token));
   if (!found) throw unauthorized("invalid_token", "That key or token is unknown, revoked or expired. Connect again to get a new one.");
   if (!found.lastUsedAt || Date.now() - found.lastUsedAt.getTime() > FIVE_MINUTES) later(() => touchToken(db(), found.tokenId));
@@ -102,7 +102,7 @@ export async function execute(op: Operation, raw: Record<string, unknown>, conte
     if (error instanceof GitHubError && error.status === 401) throw reauth();
     console.error(`Agent operation ${op.name} failed: ${describeError(error)}`);
     await captureException(error, { source: "agent", tags: { operation: op.name, surface: context.surface } });
-    throw new ApiError(500, "internal_error", "Something went wrong on Sandchest's side. Nothing was changed that you weren't told about; try again in a minute.");
+    throw new ApiError(500, "internal_error", "Something went wrong on RedNest's side. Nothing was changed that you weren't told about; try again in a minute.");
   } finally {
     // Changes are recorded (reads would drown them out): which tool, from where, and whether it went through.
     if (!op.readOnly) await track("agent_call", { userId: context.principal.userId, props: { operation: op.name, surface: context.surface, status: status } });

@@ -122,7 +122,7 @@ export function queryOf(search: string): Record<string, string> {
 }
 
 /**
- * A link Sandchest sends out (an email, a GitHub Check or review), tagged
+ * A link RedNest sends out (an email, a GitHub Check or review), tagged
  * with where it was sent, so the visit it brings is attributed to it.
  */
 export function withUtm(url: string, source: "email" | "github", medium: string): string {

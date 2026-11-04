@@ -10,7 +10,7 @@ import "../../app.css";
 // "same-origin", not "no-referrer": the URL (with its code) still never leaves the site, but a button pressed
 // before the page's script loads posts a plain form, and under no-referrer the browser sends `Origin: null`,
 // which Next refuses as a cross-site Server Action.
-export const metadata: Metadata = { title: "Connect an app · Sandchest", referrer: "same-origin", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Connect an app · RedNest", referrer: "same-origin", robots: { index: false, follow: false } };
 
 const KEYS = ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"] as const;
 
@@ -49,7 +49,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
   return (
     <SetupShell title="Connect an app?">
       <p className="sign-in-body">
-        <strong>{request.clientName}</strong> wants to use Sandchest as <strong>{user.login ?? user.name}</strong>.
+        <strong>{request.clientName}</strong> wants to use RedNest as <strong>{user.login ?? user.name}</strong>.
       </p>
       <AgentAbilities />
       <div className="agent-decide">

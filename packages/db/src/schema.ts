@@ -80,18 +80,30 @@ export const repos = pgTable(
     orgId: uuid("org_id")
       .notNull()
       .references(() => orgs.id, { onDelete: "cascade" }),
+    /**
+     * GitHub's repository id for installed repos (always positive). Quick Scan
+     * rows use a synthetic negative id from `quick_scan_repo_id_seq` so they
+     * never collide with installed repos or with each other; the real GitHub
+     * id lives on `quick_scans.github_repo_id`.
+     */
     githubRepoId: bigint("github_repo_id", { mode: "number" }).notNull().unique(),
     fullName: text("full_name").notNull(),
     private: boolean("private").notNull(),
     defaultBranch: text("default_branch").notNull(),
-    /** False once removed from the installation. */
+    /** False once removed from the installation. Quick Scan targets stay enabled for the owner. */
     enabled: boolean("enabled").notNull().default(true),
+    /** Installed App repos vs user-owned public URL Quick Scan targets. */
+    source: text("source", { enum: ["installed", "quick_scan"] })
+      .notNull()
+      .default("installed"),
+    /** Set only for `quick_scan` rows: the RedNest user who may see this target. */
+    ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
     loc: integer("loc"),
     lastDeepScanAt: timestamp("last_deep_scan_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [index("repos_org_idx").on(table.orgId)],
+  (table) => [index("repos_org_idx").on(table.orgId), index("repos_owner_user_idx").on(table.ownerUserId)],
 );
 
 /** The repo's threat model: summary text only, never source. */
@@ -523,6 +535,142 @@ export const creditClaims = pgTable("credit_claims", {
   grantedAt: timestamp("granted_at", { withTimezone: true }),
 });
 
+// ---- RedNest entitlements (hosted scan authorization) ----------------------
+
+/** Lifetime free scan and durable GitHub identity for RedNest quotas. */
+export const userEntitlements = pgTable("user_entitlements", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Durable GitHub identity: recreating a users row must not reset free scan. */
+  githubUserId: bigint("github_user_id", { mode: "number" }).notNull().unique(),
+  freeScanStatus: text("free_scan_status", { enum: ["available", "reserved", "consumed"] }).notNull().default("available"),
+  freeScanScanId: uuid("free_scan_scan_id"),
+  freeScanReservedAt: timestamp("free_scan_reserved_at", { withTimezone: true }),
+  freeScanConsumedAt: timestamp("free_scan_consumed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** UTC calendar month usage for $RED holders (YYYY-MM). */
+export const userScanMonths = pgTable(
+  "user_scan_months",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    monthUtc: text("month_utc").notNull(),
+    reserved: integer("reserved").notNull().default(0),
+    consumed: integer("consumed").notNull().default(0),
+    allowance: integer("allowance").notNull().default(50),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [primaryKey({ name: "user_scan_months_pk", columns: [table.userId, table.monthUtc] })],
+);
+
+/** One reservation per chargeable scan id (idempotent across retries). */
+export const scanEntitlements = pgTable(
+  "scan_entitlements",
+  {
+    scanId: uuid("scan_id")
+      .primaryKey()
+      .references(() => scans.id, { onDelete: "cascade" }),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["free", "monthly"] }).notNull(),
+    state: text("state", { enum: ["reserved", "consumed", "released"] }).notNull().default("reserved"),
+    monthUtc: text("month_utc"),
+    reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull().defaultNow(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+  },
+  (table) => [index("scan_entitlements_owner_idx").on(table.ownerUserId)],
+);
+
+/** One accepted sponsor per GitHub org; their personal allowance funds PR reviews. */
+export const orgSponsors = pgTable(
+  "org_sponsors",
+  {
+    orgId: uuid("org_id")
+      .primaryKey()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    sponsorUserId: uuid("sponsor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    assignedByUserId: uuid("assigned_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("org_sponsors_sponsor_idx").on(table.sponsorUserId)],
+);
+
+/**
+ * Server-controlled scan authorization that is not a user entitlement.
+ * Only `operator` (admin-token Dig) is written today; retries keep the row.
+ */
+export const scanAuthorizations = pgTable("scan_authorizations", {
+  scanId: uuid("scan_id")
+    .primaryKey()
+    .references(() => scans.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: ["operator"] }).notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * One-off public URL Quick Scan: requester ownership and the pinned public
+ * GitHub identity. The scan/findings rows stay in the existing tables; access
+ * is enforced via `repos.owner_user_id` for `source = 'quick_scan'`.
+ */
+export const quickScans = pgTable(
+  "quick_scans",
+  {
+    scanId: uuid("scan_id")
+      .primaryKey()
+      .references(() => scans.id, { onDelete: "cascade" }),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    repoId: uuid("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    githubOwner: text("github_owner").notNull(),
+    githubRepo: text("github_repo").notNull(),
+    /** Real positive GitHub repository id (not the synthetic repos.github_repo_id). */
+    githubRepoId: bigint("github_repo_id", { mode: "number" }).notNull(),
+    commitSha: text("commit_sha").notNull(),
+    canonicalUrl: text("canonical_url").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("quick_scans_owner_idx").on(table.ownerUserId), index("quick_scans_repo_idx").on(table.repoId)],
+);
+
+/**
+ * Wallet bindings for RED-04D. Unique active wallet per user and per pubkey;
+ * changing a wallet must not reset entitlements (those live on user_entitlements).
+ */
+export const userWallets = pgTable(
+  "user_wallets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    walletPubkey: text("wallet_pubkey").notNull(),
+    active: boolean("active").notNull().default(true),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("user_wallets_one_active_per_user").on(table.userId).where(sql`${table.active} = true`),
+    uniqueIndex("user_wallets_one_active_per_pubkey").on(table.walletPubkey).where(sql`${table.active} = true`),
+  ],
+);
+
 /**
  * Org-wide emails already sent, by a stable key (an auto top-up's invoice, a
  * day's failed top-ups), so a retried webhook or step never sends one twice.
@@ -674,5 +822,17 @@ export const events = pgTable(
 );
 
 export const orgRelations = relations(orgs, ({ many }) => ({ repos: many(repos) }));
-export const repoRelations = relations(repos, ({ one, many }) => ({ org: one(orgs, { fields: [repos.orgId], references: [orgs.id] }), scans: many(scans) }));
-export const scanRelations = relations(scans, ({ one }) => ({ repo: one(repos, { fields: [scans.repoId], references: [repos.id] }) }));
+export const repoRelations = relations(repos, ({ one, many }) => ({
+  org: one(orgs, { fields: [repos.orgId], references: [orgs.id] }),
+  owner: one(users, { fields: [repos.ownerUserId], references: [users.id] }),
+  scans: many(scans),
+}));
+export const scanRelations = relations(scans, ({ one }) => ({
+  repo: one(repos, { fields: [scans.repoId], references: [repos.id] }),
+  quickScan: one(quickScans, { fields: [scans.id], references: [quickScans.scanId] }),
+}));
+export const quickScanRelations = relations(quickScans, ({ one }) => ({
+  scan: one(scans, { fields: [quickScans.scanId], references: [scans.id] }),
+  repo: one(repos, { fields: [quickScans.repoId], references: [repos.id] }),
+  owner: one(users, { fields: [quickScans.ownerUserId], references: [users.id] }),
+}));

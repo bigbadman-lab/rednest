@@ -21,8 +21,8 @@ export function AppHeader({ user }: { user: Viewer }) {
   return (
     <header className="app-header">
       <div className="shell">
-        <Link href="/dashboard" className="app-mark" aria-label="Sandchest">
-          <img src="/sandchest-icon-small.svg" alt="" width={30} height={28} />
+        <Link href="/dashboard" className="app-mark" aria-label="RedNest">
+          <img src="/rednest-icon-small.svg" alt="" width={30} height={28} />
         </Link>
         <AppNav links={NAV_LINKS} />
         <div className="app-user">

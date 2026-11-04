@@ -174,7 +174,7 @@ describe("render", () => {
   test("public repos get counts and a link, never details", () => {
     const { output } = checkResult({ findings: [finding("high"), finding("low")], threshold: "high", isPublic: true, detailsUrl: "https://app/x", credits: 2 });
     const text = JSON.stringify(output);
-    expect(output.summary).toContain("Sandchest found 1 high-severity issue and 1 more.");
+    expect(output.summary).toContain("RedNest found 1 high-severity issue and 1 more.");
     expect(output.summary).toContain("2 credits");
     for (const secret of ["A high bug", "a.ts", "secret code", "GET /x", "Reads every"]) expect(text).not.toContain(secret);
   });

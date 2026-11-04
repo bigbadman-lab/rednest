@@ -24,7 +24,7 @@ async function nextSteps(context: Context): Promise<{ steps: Step[]; accounts: A
   if (accounts.length === 0) {
     steps.push({
       step: "install_github_app",
-      do: "Ask the person to open this URL, pick their GitHub account and the repositories Sandchest may read. Then call list_accounts with wait=50: it returns as soon as the account shows.",
+      do: "Ask the person to open this URL, pick their GitHub account and the repositories RedNest may read. Then call list_accounts with wait=50: it returns as soon as the account shows.",
       url: installUrl(),
     });
     return { steps, accounts };
@@ -74,7 +74,7 @@ export const accountOps = [
     name: "get_me",
     title: "Who am I, and what's next",
     description:
-      "Start here. Returns the person this agent acts as, the GitHub accounts Sandchest is installed on, and `next_steps`: what is left to set up or do, in order (install the GitHub App, join the plan or claim free credits, run a first deep scan, fix open findings). Steps only a person can take come with a URL to give them.",
+      "Start here. Returns the person this agent acts as, the GitHub accounts RedNest is installed on, and `next_steps`: what is left to set up or do, in order (install the GitHub App, join the plan or claim free credits, run a first deep scan, fix open findings). Steps only a person can take come with a URL to give them.",
     method: "GET",
     path: "/me",
     input: z.object({}),

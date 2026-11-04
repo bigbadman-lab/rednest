@@ -30,7 +30,7 @@ export function configurationProblem(env: Env = process.env): string | undefined
 export function exitOnConfigurationProblem(): void {
   const problem = configurationProblem();
   if (!problem) return;
-  console.error(`Sandchest cannot start. ${problem}`);
+  console.error(`RedNest cannot start. ${problem}`);
   process.exit(1);
 }
 

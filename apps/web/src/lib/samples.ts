@@ -254,6 +254,7 @@ export function sampleSettings(): { orgs: SettingsOrg[]; billing: OrgBillingRow 
     settings: { checkThreshold: "high", emailNotifications: true },
     admin: true,
     billing,
+    sponsored: true,
     repos: sampleRepos().map((repo) => ({ id: repo.id, fullName: repo.fullName, private: repo.private })),
   };
   return { orgs: [org], billing };

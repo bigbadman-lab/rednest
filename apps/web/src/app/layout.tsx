@@ -3,7 +3,7 @@ import { Geist_Mono, Jersey_10 } from "next/font/google";
 import type { ReactNode } from "react";
 import { Analytics } from "@/components/analytics";
 import { browserReporter } from "@/lib/sentry-browser";
-import { brandAsset, site, socialImage, socialVideo } from "@/lib/site";
+import { brandAsset, site, socialImage } from "@/lib/site";
 import "./globals.css";
 
 const display = Jersey_10({
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: brandAsset("/favicon.ico"), sizes: "16x16 32x32 48x48" },
-      { url: brandAsset("/favicon.svg"), type: "image/svg+xml" },
+      { url: brandAsset("/Redpfp.png"), type: "image/png", sizes: "any" },
       { url: brandAsset("/favicon-96x96.png"), sizes: "96x96", type: "image/png" },
       { url: brandAsset("/favicon-48x48.png"), sizes: "48x48", type: "image/png" },
       { url: brandAsset("/favicon-32x32.png"), sizes: "32x32", type: "image/png" },
@@ -40,7 +40,6 @@ export const metadata: Metadata = {
     siteName: site.name,
     type: "website",
     images: [socialImage],
-    videos: [socialVideo],
   },
   twitter: {
     card: "summary_large_image",
@@ -51,7 +50,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0a07",
+  themeColor: "#0a0a0b",
   colorScheme: "dark",
 };
 

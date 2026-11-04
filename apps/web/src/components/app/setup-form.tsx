@@ -9,7 +9,7 @@ import { APP_NAME_MAX, buildManifest, GITHUB_LOGIN, manifestFormAction } from "@
 export function SetupForm({ appUrl, redirectUrl, state }: { appUrl: string; redirectUrl: string; state: string }) {
   const [owner, setOwner] = useState<"user" | "org">("user");
   const [org, setOrg] = useState("");
-  const [name, setName] = useState("Sandchest");
+  const [name, setName] = useState("RedNest");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
 
   const orgValid = GITHUB_LOGIN.test(org);
@@ -63,7 +63,7 @@ export function SetupForm({ appUrl, redirectUrl, state }: { appUrl: string; redi
       </fieldset>
       <fieldset>
         <legend className="field-legend">Who can install it</legend>
-        <p className="field-help">Keep it to the owner unless you run Sandchest as a service for other accounts.</p>
+        <p className="field-help">Keep it to the owner unless you run RedNest as a service for other accounts.</p>
         <div className="segments">
           <label className="segment">
             <input type="radio" name="visibility" value="private" checked={visibility === "private"} onChange={() => setVisibility("private")} />

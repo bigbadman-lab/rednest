@@ -5,6 +5,8 @@ export type { EventName, EventProps, HackerProfile, OrgSettings } from "./schema
 export { EVENT_NAMES } from "./schema";
 export * from "./dashboard";
 export * from "./billing";
+export * from "./entitlements";
+export * from "./quick-scans";
 export * from "./recruit";
 export * from "./events";
 export * from "./learning";

@@ -10,7 +10,7 @@ import { db } from "@/server/db";
 import { orgPlans } from "@/server/org-plans";
 import { DAYS, OverviewView } from "./overview-view";
 
-export const metadata: Metadata = { title: "Overview · Sandchest" };
+export const metadata: Metadata = { title: "Overview · RedNest" };
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ installation_id?: string; setup_action?: string; state?: string; plan?: string; recruited?: string; later?: string }> }) {
   const user = await viewer();
@@ -42,9 +42,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   ]);
   reads.catch(() => {});
   const repos = await dashboardRepos(db(), user.id);
-  // Not set up yet: go straight to recruiting, unless they chose to finish it later.
+  // Not set up yet: stay on overview (Quick Scan) unless they continue recruiting.
   const later = params.later === "1";
-  if (repos.length === 0 && !later) redirect("/dashboard/recruit");
 
   const plans = await orgPlans(repos);
   const orgs = [...new Map(repos.map((repo) => [repo.orgId, repo])).values()];
@@ -53,7 +52,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   // straight back from paying (the plan may not show yet) or when they left it for later.
   const joined = orgs.some((repo) => plans.get(repo.orgId)?.planId);
   const recruitable = unpaid.find((repo) => repo.orgAdmin);
-  if (!joined && recruitable && !later && !params.plan && !params.recruited) redirect(`/dashboard/recruit?org=${recruitable.orgId}`);
+  if (repos.length > 0 && !joined && recruitable && !later && !params.plan && !params.recruited) redirect(`/dashboard/recruit?org=${recruitable.orgId}`);
 
   if (repos.length === 0) {
     return (
@@ -62,12 +61,17 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <div className="empty" style={{ marginTop: "2rem" }}>
           <h2 className="empty-title">Nothing to scan yet</h2>
           <p>
-            Connect a GitHub account, choose the repositories Sandchest may read, and recruit the hacker who scans
-            them. Reviews, findings and scans show up here once you can push to a repository.
+            Quick Scan a public GitHub repository now, or connect the GitHub App for private repos and continuous
+            monitoring.
           </p>
-          <Link href="/dashboard/recruit" className="key key-primary key-large key-glow">
-            <span className="key-face">Get started</span>
-          </Link>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", justifyContent: "center" }}>
+            <Link href="/dashboard/scans" className="key key-primary key-large key-glow">
+              <span className="key-face">Quick Scan</span>
+            </Link>
+            <Link href="/dashboard/recruit" className="key key-secondary key-large">
+              <span className="key-face">Connect GitHub</span>
+            </Link>
+          </div>
         </div>
       </PageShape>
     );

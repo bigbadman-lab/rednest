@@ -51,6 +51,25 @@ export class GitHubApp {
   }
 
   /**
+   * Public repository metadata via the App JWT (no installation). Used by
+   * Quick Scan before entitlement reservation. Never returns a clone token.
+   */
+  async publicRepository(owner: string, repo: string): Promise<PublicRepository> {
+    return githubRequest<PublicRepository>(async () => appJwt(this.config), `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {}, this.http);
+  }
+
+  /** Commit SHA a public branch currently points at (App JWT, no installation). */
+  async publicBranchSha(owner: string, repo: string, branch: string): Promise<string> {
+    const result = await githubRequest<{ commit: { sha: string } }>(
+      async () => appJwt(this.config),
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branch)}`,
+      {},
+      this.http,
+    );
+    return result.commit.sha;
+  }
+
+  /**
    * An installation token, shared by concurrent callers and refreshed before
    * expiry. `scope` narrows it to repositories and permissions.
    */
@@ -81,6 +100,20 @@ export interface InstalledRepository {
   language?: string | null;
   description?: string | null;
   pushed_at?: string | null;
+}
+
+/** Fields Quick Scan needs from GET /repos/{owner}/{repo}. */
+export interface PublicRepository {
+  id: number;
+  full_name: string;
+  private: boolean;
+  default_branch: string;
+  /** Approximate repo size in kilobytes (GitHub's `size` field). */
+  size: number;
+  archived: boolean;
+  disabled: boolean;
+  fork: boolean;
+  owner: { login: string; id: number; type: string };
 }
 
 /** The fields of GET /orgs/{org} and /users/{user} that Sandchest reads. Orgs have `description`, users `bio`. */

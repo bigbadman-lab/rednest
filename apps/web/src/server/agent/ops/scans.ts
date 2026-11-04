@@ -48,7 +48,7 @@ export const scanOps = [
     name: "list_repos",
     title: "List repositories",
     description:
-      "Repositories Sandchest can scan for this person (installed, with push access), most exposed first: open findings by severity, the latest scan, and what a deep scan costs now (or whether it's the account's free first one).",
+      "Repositories RedNest can scan for this person (installed, with push access), most exposed first: open findings by severity, the latest scan, and what a deep scan costs now (or whether it's the account's free first one).",
     method: "GET",
     path: "/repos",
     input: z.object({ account: AccountRef.optional().describe("Only this account's repositories.") }),
@@ -106,27 +106,42 @@ export const scanOps = [
       const { requestDeepScan } = await import("../../dig");
       let result: Awaited<ReturnType<typeof requestDeepScan>>;
       try {
-        result = await requestDeepScan({ ...row.repo, org: row.org });
+        result = await requestDeepScan({ ...row.repo, org: row.org }, "manual", { ownerUserId: context.principal.userId });
       } catch (error) {
         console.error(`Agent deep scan failed: ${describeError(error)}`);
         await captureException(error, { source: "dig", tags: { via: context.surface }, handled: true });
         await record("error");
-        throw new ApiError(502, "scan_not_started", "The deep scan couldn't start (GitHub or billing didn't answer). Nothing was charged; try again in a minute.");
+        throw new ApiError(502, "scan_not_started", "The deep scan couldn't start (GitHub or entitlements didn't answer). Nothing was charged; try again in a minute.");
       }
       if (!result.ok) {
         await record(result.reason, { credits: result.credits, scanId: result.scanId });
-        const login = row.org.githubLogin;
         switch (result.reason) {
           case "running":
             throw new ApiError(409, "already_running", "A deep scan of this repository is already running. Follow it with get_scan.", { scan_id: result.scanId });
           case "not_installed":
-            throw new ApiError(409, "not_installed", `Sandchest is no longer installed on ${row.repo.fullName}.`);
+            throw new ApiError(409, "not_installed", `RedNest is no longer installed on ${row.repo.fullName}.`);
           case "too_large":
             throw new ApiError(422, "too_large", "This repository is over a million lines of code, too large for a deep scan.");
+          case "holder_inactive":
+          case "free_used":
+            throw new ApiError(402, "holder_inactive", "Your free scan is used. $RED holder access is not available yet.");
+          case "wallet_required":
+            throw new ApiError(402, "wallet_required", "Connect a verified wallet holding at least 50,000 $RED to keep scanning.");
+          case "insufficient_red":
+            throw new ApiError(402, "insufficient_red", "This wallet needs at least 50,000 $RED for more scans this month.");
+          case "quota_exhausted":
+            throw new ApiError(402, "quota_exhausted", "You have used all 50 holder scans for this UTC month.");
+          case "auth_required":
+            throw new ApiError(401, "auth_required", "Sign in with GitHub to scan.");
+          case "no_sponsor":
+            throw new ApiError(
+              402,
+              "no_sponsor",
+              `${row.org.githubLogin} has no scan sponsor yet. An admin must accept sponsorship in Settings before the first dig can run.`,
+            );
           case "no_plan":
-            throw new ApiError(402, "no_plan", `${login} has no plan, so nothing scans. Call get_billing for ${login}: claim free credits or buy credits first.`, { account: login });
           case "out_of_credits":
-            throw new ApiError(402, "out_of_credits", `${login} doesn't have enough credits${result.credits ? `: this deep scan needs ${result.credits}` : ""}. Call buy_credits for ${login}.`, { account: login, credits_needed: result.credits ?? null });
+            throw new ApiError(402, "holder_inactive", "This scan was not authorized under RedNest entitlements.");
         }
       }
       await record("ok", { scanId: result.scanId });

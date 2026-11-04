@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { PlayOnView } from "@/components/play-on-view";
 
 /**
- * How Sandchest works, end to end, in four steps. Each step has a small window
+ * How RedNest works, end to end, in four steps. Each step has a small window
  * that plays once when it scrolls into view and then rests on its final frame
  * (see the `fx-*` classes in globals.css). Everything is CSS: no script runs
  * for these beyond PlayOnView's one observer per step. The windows are
@@ -107,7 +107,7 @@ const MAP = [
 
 function InstallVisual() {
   return (
-    <Win title="Install Sandchest" icon={<GitHubMark />}>
+    <Win title="Install RedNest" icon={<GitHubMark />}>
       <p className="vis-label">Repository access</p>
       <ul className="repos">
         {REPOS.map((repo) => (

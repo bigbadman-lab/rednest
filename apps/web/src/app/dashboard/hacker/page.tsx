@@ -22,7 +22,7 @@ async function chosen(org: string | undefined) {
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const { member } = await chosen((await searchParams).org);
-  return { title: `${member ? readHacker(member.hacker).handle : "Your hacker"} · Sandchest` };
+  return { title: `${member ? readHacker(member.hacker).handle : "Your hacker"} · RedNest` };
 }
 
 /**

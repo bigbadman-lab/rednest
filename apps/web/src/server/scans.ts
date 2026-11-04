@@ -5,7 +5,7 @@
  */
 import { withUtm } from "@/lib/analytics";
 import { RECON_WAIT } from "@/lib/scan-progress";
-import { DEEP_SCAN_TIERS, deepScanCredits, prReviewCredits } from "@sandchest/billing";
+import { deepScanCredits, prReviewCredits } from "@sandchest/billing";
 import { criticalFindingEmail, deepScanEmail } from "@sandchest/email";
 import {
   claimNotification,
@@ -49,8 +49,16 @@ import { checkResult, notReviewed, parsePatch, reviewBody, reviewComment, shown,
 import type { IndexerBinary, Workspace } from "@sandchest/workspace";
 import { LocalWorkspace } from "@sandchest/workspace/local";
 import { SandboxWorkspace } from "@sandchest/workspace/sandbox";
-import { billingEnabled, reserveScan, settleScan, syncBilling, type Gate } from "./billing";
+import { publicGithubCloneUrl } from "@/lib/github-repo-url";
+import { settleScan, syncBilling } from "./billing";
 import { config } from "./config";
+import {
+  isOperatorAuthorizedScan,
+  markScanEntitlementStarted,
+  orgLifecycleAllowed,
+  releaseUnusedScanEntitlement,
+  scanMayStart,
+} from "./entitlements";
 import { describeError } from "./log";
 import { noticeScanPaused } from "./notices";
 import { classifier, db, githubApp, llmClient, mailer, osvClient, pricing } from "./services";
@@ -60,7 +68,7 @@ import { captureException } from "./sentry";
 export const ORG_CONCURRENCY = 2;
 /** The engine's wall-clock budget inside a workflow step: under Vercel's 800 s function limit. */
 const SCAN_BUDGET_MS = 12 * 60_000;
-const CHECK_NAME = "Sandchest";
+const CHECK_NAME = "RedNest";
 
 /** A scan's job is done; retries and duplicate starts must not redo it. */
 export class ScanFinished extends Error {}
@@ -74,16 +82,30 @@ export type BeginResult = { state: "running" | "queued" | "done" };
 export async function beginScan(scanId: string): Promise<BeginResult> {
   const scan = await requireScan(scanId);
   if (["completed", "failed", "cancelled", "refused", "publishing"].includes(scan.status)) return { state: "done" };
-  if (scan.status === "queued" && scan.billing === null && billingEnabled()) {
-    const gate = await reserveScan(scan.id, { id: scan.orgId, githubLogin: scan.repo.org.githubLogin }, await scanCredits(scan));
-    if (!gate.ok) {
-      await refuse(scan, gate);
+
+  // Chargeable scans must already hold a RedNest entitlement reservation (Dig / agent / PR)
+  // or a server-controlled operator authorization. Recon and fix checks need an accepted
+  // org sponsor — unless this specific scan was operator-authorized (bounded exception).
+  if (scan.status === "queued") {
+    if (scan.kind === "deep" || scan.kind === "pr_review") {
+      if (!(await scanMayStart(scan.id))) {
+        await refuseUnauthorized(scan, "Not run: no scan entitlement was reserved.");
+        return { state: "done" };
+      }
+    } else if (!(await orgLifecycleAllowed(scan.orgId)) && !(await isOperatorAuthorizedScan(db(), scan.id))) {
+      await refuseUnauthorized(scan, "Not run: this GitHub account has no scan sponsor yet.");
       return { state: "done" };
     }
   }
+
   // A deep scan of a repo still being mapped waits for the map and builds on it, rather than mapping it again
   // beside the recon (the first deep scan starts the moment recon does).
   if (scan.status === "queued" && scan.kind === "deep" && (await pendingRecon(db(), scan.repoId))) {
+    // Safety net: never hold a user's reserved free scan forever behind unsponsored recon.
+    if (!(await orgLifecycleAllowed(scan.orgId)) && !(await isOperatorAuthorizedScan(db(), scan.id))) {
+      await refuseUnauthorized(scan, "Not run: this GitHub account has no scan sponsor yet. An admin must accept scan sponsorship in Settings.");
+      return { state: "done" };
+    }
     await noteScanEvent(db(), scan.id, RECON_WAIT, `Waiting for recon to map ${scan.repo.fullName} first, usually under a minute. The deep scan starts from that map as soon as it’s done.`);
     return { state: "queued" };
   }
@@ -109,27 +131,21 @@ export async function beginScan(scanId: string): Promise<BeginResult> {
       });
     await updateScan(db(), scan.id, { checkRunId });
   }
+  // Successful start consumes the reservation (retries of this scan id do not re-charge).
+  if (scan.kind === "deep" || scan.kind === "pr_review") {
+    await markScanEntitlementStarted(scan.id);
+  }
   return { state: "running" };
 }
 
-/** What a scan costs, before it runs. A PR review costs what the engine will report for the same files. */
-async function scanCredits(scan: LoadedScan): Promise<number> {
-  // Not sized yet: hold the most a deep scan can cost; the charge is what it measures.
-  if (scan.kind === "deep") return (scan.repo.loc === null ? undefined : deepScanCredits(scan.repo.loc)) ?? DEEP_SCAN_TIERS.at(-1)!.credits;
-  if (scan.kind !== "pr_review" || !scan.prNumber || !scan.repo.org.installationId) return 0;
-  const files = await githubApp().installation(scan.repo.org.installationId).pullFiles(scan.repo.fullName, scan.prNumber);
-  const relevant = relevantChanges(files.map(toChangedFile));
-  return relevant.length ? prReviewCredits(changedLines(relevant)) : 0;
-}
-
-/** A scan billing would not let run: recorded as refused, and a PR gets a neutral Check that never blocks merging. */
-async function refuse(scan: LoadedScan, gate: Exclude<Gate, { ok: true }>): Promise<void> {
-  const message = gate.reason === "no_plan" ? "Not run: this account has no plan." : `Not run: out of credits (needs ${gate.credits}).`;
-  // The Check first: once the scan is marked refused, a retried step would never post it.
+/** Unauthorized before execution: release unused entitlement and close any PR Check neutrally. */
+async function refuseUnauthorized(scan: LoadedScan, message: string): Promise<void> {
+  await releaseUnusedScanEntitlement(scan.id).catch(() => {});
   let checkRunId = scan.checkRunId;
   if (scan.kind === "pr_review" && scan.repo.org.installationId) {
     const installation = githubApp().installation(scan.repo.org.installationId);
-    const { conclusion, output } = notReviewed(gate.reason, withUtm(`${appUrl()}/dashboard/settings`, "github", "check"), gate.credits);
+    const { conclusion, output } = notReviewed("no_plan", withUtm(`${appUrl()}/dashboard/settings`, "github", "check"));
+    output.summary = message;
     checkRunId ??= await installation.createCheckRun(scan.repo.fullName, { name: CHECK_NAME, headSha: scan.headSha, externalId: scan.id, output });
     await installation.completeCheckRun(scan.repo.fullName, checkRunId, conclusion, output);
   }
@@ -140,12 +156,16 @@ async function refuse(scan: LoadedScan, gate: Exclude<Gate, { ok: true }>): Prom
 export async function executeScan(scanId: string): Promise<{ findings: number }> {
   const scan = await requireScan(scanId);
   if (scan.status !== "running") return { findings: 0 };
+  const isQuickScan = scan.repo.source === "quick_scan";
   const installationId = scan.repo.org.installationId;
-  if (!installationId || !scan.repo.enabled) throw new ScanFinished("Repository is no longer installed");
+  if (!isQuickScan && (!installationId || !scan.repo.enabled)) throw new ScanFinished("Repository is no longer installed");
+  if (isQuickScan && !scan.repo.enabled) throw new ScanFinished("Quick Scan target is no longer available");
+  // Quick Scan never publishes Checks/PR reviews; fix_check/pr_review require an installation.
+  if (isQuickScan && scan.kind !== "deep" && scan.kind !== "recon") throw new ScanFinished("Quick Scan only supports deep scans");
 
-  const installation = githubApp().installation(installationId);
+  const installation = installationId ? githubApp().installation(installationId) : undefined;
   // A fix check settles what it has to re-check before any sandbox or clone, so a push that touches no cited file costs one API call.
-  const affected = scan.kind === "fix_check" ? await affectedFindings(scan, installation) : [];
+  const affected = scan.kind === "fix_check" && installation ? await affectedFindings(scan, installation) : [];
   if (scan.kind === "fix_check" && affected.length === 0) return { findings: 0 };
   const events = new EventWriter(db(), scan.id);
   // A stage's name travels with it ("stage:hunt"), so the page can light its step on the track.
@@ -158,10 +178,23 @@ export async function executeScan(scanId: string): Promise<{ findings: number }>
 
   try {
     const ref = scan.headSha === "HEAD" ? scan.repo.defaultBranch : scan.headSha;
+    const clonePromise = isQuickScan
+      ? (() => {
+          const [owner, name] = scan.repo.fullName.split("/");
+          if (!owner || !name) throw new ScanFinished("Quick Scan repository identity is invalid");
+          // Trusted server-side identity only — never a user-supplied URL.
+          return workspace.clone({ url: publicGithubCloneUrl(owner, name), ref }, { depth: 1 });
+        })()
+      : installation!.cloneToken(scan.repo.githubRepoId).then((token) =>
+          workspace.clone(
+            { url: `${(settings.SANDCHEST_GIT_HOST ?? "https://github.com").replace(/\/$/, "")}/${scan.repo.fullName}.git`, ref },
+            { depth: 1, token },
+          ),
+        );
     // Clone while the diff and the stored threat model load.
     const [, pullFiles, memory] = await Promise.all([
-      installation.cloneToken(scan.repo.githubRepoId).then((token) => workspace.clone({ url: `${(settings.SANDCHEST_GIT_HOST ?? "https://github.com").replace(/\/$/, "")}/${scan.repo.fullName}.git`, ref }, { depth: 1, token })),
-      scan.kind === "pr_review" && scan.prNumber ? installation.pullFiles(scan.repo.fullName, scan.prNumber) : Promise.resolve(undefined),
+      clonePromise,
+      scan.kind === "pr_review" && scan.prNumber && installation ? installation.pullFiles(scan.repo.fullName, scan.prNumber) : Promise.resolve(undefined),
       storedThreatModel(db(), scan.repo.id),
     ]);
     const headSha = (await workspace.exec(["git", "rev-parse", "HEAD"])).stdout.trim();
@@ -282,7 +315,7 @@ export async function publishScan(scanId: string): Promise<void> {
  */
 async function notifyScan(scan: NonNullable<Awaited<ReturnType<typeof scanById>>>): Promise<void> {
   if (scan.kind !== "deep" && scan.kind !== "pr_review") return;
-  // Uninstalled or removed while the scan ran: nobody is told about code Sandchest may no longer read.
+  // Uninstalled or removed while the scan ran: nobody is told about code RedNest may no longer read.
   if (!scan.repo.org.installationId || !scan.repo.enabled) return;
   if (scan.repo.org.settings.emailNotifications === false || !mailer().enabled) return;
   const stats = (scan.stats ?? {}) as { findingIds?: string[]; newFindingIds?: string[] };
@@ -319,6 +352,12 @@ async function charge(scan: LoadedScan): Promise<void> {
 /** Records a failure, gives back the scan's credits and never leaves a PR Check spinning. */
 export async function failScan(scanId: string, message: string): Promise<void> {
   const scan = await requireScan(scanId);
+  // RedNest: only unused (never-started) reservations are released. Started scans stay consumed.
+  await releaseUnusedScanEntitlement(scan.id).catch(async (error: unknown) => {
+    console.error(`Releasing entitlement for scan ${scan.id} failed: ${describeError(error)}`);
+    await captureException(error, { source: "billing", tags: { action: "release_entitlement", scan_id: scan.id }, handled: true });
+  });
+  // Legacy Autumn holds, if any, are still released.
   await settleScan(scan, "release").catch(async (error: unknown) => {
     console.error(`Releasing scan ${scan.id} failed: ${describeError(error)}`);
     await captureException(error, { source: "billing", tags: { action: "release", scan_id: scan.id }, handled: true });
@@ -329,7 +368,7 @@ export async function failScan(scanId: string, message: string): Promise<void> {
       .installation(scan.repo.org.installationId)
       .completeCheckRun(scan.repo.fullName, scan.checkRunId, "neutral", {
         title: scan.status === "refused" ? "Not reviewed" : "Review could not finish",
-        summary: scan.status === "refused" ? message : "Sandchest could not finish this review. It does not block merging; push again to retry.",
+        summary: scan.status === "refused" ? message : "RedNest could not finish this review. It does not block merging; push again to retry.",
       });
   }
 }

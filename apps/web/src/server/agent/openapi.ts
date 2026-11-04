@@ -35,9 +35,9 @@ export function openApi(): Json {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Sandchest API",
+      title: "RedNest API",
       version: "1.0.0",
-      description: `Everything the Sandchest dashboard does, for agents. Connect with the device flow or OAuth (${appUrl()}/docs/agents), then send \`Authorization: Bearer <key>\`. The same operations are MCP tools at ${appUrl()}/api/mcp.`,
+      description: `Everything the RedNest dashboard does, for agents. Connect with the device flow or OAuth (${appUrl()}/docs/agents), then send \`Authorization: Bearer <key>\`. The same operations are MCP tools at ${appUrl()}/api/mcp.`,
     },
     servers: [{ url: appUrl() }],
     security: [{ bearer: [] }],

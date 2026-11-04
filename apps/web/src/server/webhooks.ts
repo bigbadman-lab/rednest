@@ -34,11 +34,12 @@ export interface WebhookDeps {
   /** Starts the scan workflow for a scan record. */
   startScan(scanId: string): Promise<void>;
   /**
-   * Whether the org may scan: a plan and credits left. Recon waits until it
-   * can: buying a plan, or credits after running out, starts it. Omitted
-   * means billing is off.
+   * Whether lifecycle scans (recon) may run for the org. Under RedNest this
+   * means an accepted scan sponsor exists. Omitted means allow (tests).
    */
   canScan?(org: { id: string; githubLogin: string }): Promise<boolean>;
+  /** Reserves a chargeable PR review against the org sponsor before start. */
+  authorizePrReview?(input: { scanId: string; orgId: string }): Promise<{ ok: true } | { ok: false; detail: string }>;
 }
 
 export type WebhookOutcome = { status: "duplicate" | "ignored" | "handled"; detail?: string; scans?: string[] };
@@ -139,7 +140,7 @@ async function onInstallationRepositories(deps: WebhookDeps, payload: Installati
  * doubles up with the recon that buying a plan starts.
  */
 export async function startRecon(deps: WebhookDeps, org: { id: string; githubLogin: string }): Promise<WebhookOutcome> {
-  if (deps.canScan && !(await deps.canScan(org))) return { status: "handled", scans: [], detail: "recon waits for a plan and credits" };
+  if (deps.canScan && !(await deps.canScan(org))) return { status: "handled", scans: [], detail: "recon waits for an accepted scan sponsor" };
   // "HEAD" is resolved to the default branch's commit when the scan clones.
   const scans = await queuePendingRecons(deps.db, org.id);
   // Started together: each start is idempotent (claimWorkflowStart), so a failure that brings a redelivery repeats nothing.
@@ -215,6 +216,21 @@ async function newScan(
     values.kind === "recon" || values.kind === "fix_check" ? await queuePushScan(deps.db, { ...values, kind: values.kind }) : await createScan(deps.db, values);
   const orphaned = !created && scan.status === "queued" && !scan.workflowRunId;
   if (!created && !orphaned) return "";
+
+  if (values.kind === "pr_review" && deps.authorizePrReview) {
+    const gate = await deps.authorizePrReview({ scanId: scan.id, orgId: values.orgId });
+    if (!gate.ok) {
+      // Leave a refused scan rather than starting unauthorized work.
+      const { updateScan } = await import("@sandchest/db");
+      await updateScan(deps.db, scan.id, { status: "refused", error: gate.detail, finishedAt: new Date() });
+      return "";
+    }
+  }
+
+  if ((values.kind === "recon" || values.kind === "fix_check") && deps.canScan && !(await deps.canScan({ id: values.orgId, githubLogin: "" }))) {
+    return "";
+  }
+
   await deps.startScan(scan.id);
   return scan.id;
 }

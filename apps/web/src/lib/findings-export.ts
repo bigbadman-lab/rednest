@@ -87,14 +87,14 @@ export function markdownReport(rows: ExportedFinding[], context: ExportContext):
   const body = rows
     .map((row, i) => {
       const rating = [`**${SEVERITY_LABEL[row.severity]}**`, `${row.confidence} confidence`, categoryLabel(row.category), row.cwe, statusOf(row)].filter(Boolean).join(" · ");
-      const origin = [`Repository: ${row.repoFullName}`, row.prNumber !== null ? `found reviewing PR #${row.prNumber}` : "", `first seen ${shortDate(row.firstSeenAt)}`, `[view in Sandchest](${link(row)})`].filter(Boolean).join(" · ");
+      const origin = [`Repository: ${row.repoFullName}`, row.prNumber !== null ? `found reviewing PR #${row.prNumber}` : "", `first seen ${shortDate(row.firstSeenAt)}`, `[view in RedNest](${link(row)})`].filter(Boolean).join(" · ");
       const moved = row.stale ? "\n\nThe cited code has changed since it was found; the next deep scan checks it again." : "";
       const sections = findingSections(promptFinding(row), { heading: "###", link: (file, line) => githubLine(row.repoFullName, row.defaultBranch, file, line) });
       return `## ${i + 1}. ${row.title}\n\n${rating}\n\n${origin}${moved}\n\n${sections}`;
     })
     .join("\n\n---\n\n");
 
-  return `# Sandchest findings
+  return `# RedNest findings
 
 ${describe(rows, context)}. Exported ${shortDate(context.now ?? new Date())}.
 

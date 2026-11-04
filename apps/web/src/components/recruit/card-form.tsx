@@ -45,7 +45,7 @@ function appearance(accent: string): Appearance {
 
 /**
  * The card form: Stripe's Payment Element, in Stripe's own frame on this
- * page, so the card goes from the browser to Stripe and never to Sandchest.
+ * page, so the card goes from the browser to Stripe and never to RedNest.
  * Stripe.js loads only when this mounts.
  */
 export function CardForm({

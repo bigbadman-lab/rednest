@@ -127,7 +127,7 @@ export async function handleRest(request: Request, segments: string[]): Promise<
   } catch (error) {
     if (error instanceof ApiError) return errorResponse(error);
     console.error("Agent API request failed");
-    return errorResponse(new ApiError(500, "internal_error", "Something went wrong on Sandchest's side. Try again in a minute."));
+    return errorResponse(new ApiError(500, "internal_error", "Something went wrong on RedNest's side. Try again in a minute."));
   }
 }
 
@@ -135,8 +135,8 @@ export async function handleRest(request: Request, segments: string[]): Promise<
 export function index() {
   const base = appUrl();
   return {
-    name: "Sandchest API",
-    about: "Sandchest is a hacker for your team: it reviews pull requests and deep scans repositories for real, exploitable vulnerabilities. Everything in the dashboard can be done here.",
+    name: "RedNest API",
+    about: "RedNest is a hacker for your team: it reviews pull requests and deep scans repositories for real, exploitable vulnerabilities. Everything in the dashboard can be done here.",
     docs: `${base}/docs/agents`,
     docs_markdown: `${base}/docs/agents.md`,
     openapi: `${base}/api/v1/openapi.json`,

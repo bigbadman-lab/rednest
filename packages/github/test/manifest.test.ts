@@ -12,7 +12,7 @@ const conversion = {
   id: 424242,
   slug: "sandchest-acme",
   node_id: "A_kwDOexample",
-  name: "Sandchest Acme",
+  name: "RedNest Acme",
   owner: { login: "acme", id: 1, type: "Organization" },
   html_url: "https://github.com/apps/sandchest-acme",
   permissions: APP_PERMISSIONS,
@@ -33,7 +33,7 @@ function fakeGitHub(answer: () => Response) {
 }
 
 describe("manifest", () => {
-  const manifest = buildManifest({ appUrl: "https://sandchest.example.com/", redirectUrl: "https://sandchest.example.com/setup/callback", name: "  Sandchest Acme  ", public: false });
+  const manifest = buildManifest({ appUrl: "https://sandchest.example.com/", redirectUrl: "https://sandchest.example.com/setup/callback", name: "  RedNest Acme  ", public: false });
 
   test("points webhooks, sign-in and the post-install page at the deployment", () => {
     expect(manifest.url).toBe("https://sandchest.example.com");
@@ -41,7 +41,7 @@ describe("manifest", () => {
     expect(manifest.callback_urls).toEqual(["https://sandchest.example.com/api/auth/callback/github"]);
     expect(manifest.setup_url).toBe("https://sandchest.example.com/dashboard");
     expect(manifest.redirect_url).toBe("https://sandchest.example.com/setup/callback");
-    expect(manifest.name).toBe("Sandchest Acme");
+    expect(manifest.name).toBe("RedNest Acme");
     expect(manifest.public).toBe(false);
     expect(manifest.request_oauth_on_install).toBe(false);
   });
@@ -62,7 +62,7 @@ describe("manifest", () => {
 
   test("keeps names within GitHub's limit and never empty", () => {
     expect(buildManifest({ appUrl: "https://x.test", redirectUrl: "https://x.test/setup/callback", name: "x".repeat(50), public: true }).name).toHaveLength(34);
-    expect(buildManifest({ appUrl: "https://x.test", redirectUrl: "https://x.test/setup/callback", name: "   ", public: true }).name).toBe("Sandchest");
+    expect(buildManifest({ appUrl: "https://x.test", redirectUrl: "https://x.test/setup/callback", name: "   ", public: true }).name).toBe("RedNest");
   });
 
   test("posts to the person's account or to an organisation, carrying the state", () => {
@@ -82,7 +82,7 @@ describe("conversion", () => {
     expect(app).toEqual({
       id: 424242,
       slug: "sandchest-acme",
-      name: "Sandchest Acme",
+      name: "RedNest Acme",
       htmlUrl: "https://github.com/apps/sandchest-acme",
       owner: "acme",
       settingsUrl: "https://github.com/organizations/acme/settings/apps/sandchest-acme",
@@ -144,7 +144,7 @@ describe("env block", () => {
   const app: CreatedApp = {
     id: 424242,
     slug: "sandchest-acme",
-    name: "Sandchest Acme",
+    name: "RedNest Acme",
     htmlUrl: "https://github.com/apps/sandchest-acme",
     owner: "acme",
     settingsUrl: "https://github.com/organizations/acme/settings/apps/sandchest-acme",

@@ -143,3 +143,29 @@ export async function saveOrgSettings(orgId: string, _previous: SettingsOutcome,
   revalidatePath("/dashboard/settings");
   return { saved: true };
 }
+
+export type SponsorOutcome = { accepted?: boolean; error?: string };
+
+/**
+ * Explicit scan-sponsorship acceptance for a GitHub App admin. Charges the
+ * accepting user's personal RedNest allowance for automatic PR reviews.
+ */
+export async function acceptScanSponsorship(orgId: string, _previous: SponsorOutcome, _form: FormData): Promise<SponsorOutcome> {
+  const user = await viewer();
+  if (!Id.safeParse(orgId).success) return { error: "That account isn’t valid." };
+  const { orgForAdmin } = await import("@sandchest/db");
+  const org = await orgForAdmin(db(), user.id, orgId);
+  if (!org) return { error: "Only a GitHub administrator of this account can accept scan sponsorship." };
+
+  const { acceptSponsorshipAsAdmin } = await import("./entitlements");
+  const result = await acceptSponsorshipAsAdmin(orgId, user.id);
+  if (!result.ok) {
+    return { error: "This account already has a different scan sponsor. Sponsorship can’t be transferred silently." };
+  }
+  // Kick lifecycle recon now that the org is sponsored.
+  const { startPendingRecon } = await import("./billing");
+  await startPendingRecon(orgId).catch(() => {});
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  return { accepted: true };
+}

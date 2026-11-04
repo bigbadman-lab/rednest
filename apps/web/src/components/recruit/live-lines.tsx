@@ -29,7 +29,7 @@ function share(): number {
 }
 
 /**
- * Every line of code Sandchest has read, counting up as scans finish, and
+ * Every line of code RedNest has read, counting up as scans finish, and
  * how many are running right now: one number, as large as the empty side
  * of the screen allows, in the landing's pixel gold with a dithered
  * extrusion. The server reads the real totals every ten minutes; the count
@@ -103,11 +103,11 @@ export function LiveLines({ initial, hidden = false, className = "onboard-live" 
   // to fill the space beside the panel exactly.
   const ems = [...text].reduce((sum, ch) => sum + (ch === "," ? 0.16 : 0.375), 0);
   return (
-    <aside className={`live-lines ${className}`} data-hidden={hidden || undefined} data-pending={stats ? undefined : ""} aria-label="Sandchest right now" style={{ "--ems": ems } as CSSProperties}>
+    <aside className={`live-lines ${className}`} data-hidden={hidden || undefined} data-pending={stats ? undefined : ""} aria-label="RedNest right now" style={{ "--ems": ems } as CSSProperties}>
       <p className="live-lines-count" data-n={text}>
         {text}
       </p>
-      <p className="live-lines-label">lines of code scanned by Sandchest</p>
+      <p className="live-lines-label">lines of code scanned by RedNest</p>
       {stats && stats.running > 0 && (
         <p className="live-lines-running">
           <span className="live-lines-dot" aria-hidden="true" />

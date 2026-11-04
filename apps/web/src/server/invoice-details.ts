@@ -1,7 +1,7 @@
 /**
  * A business's details for its invoices: the name and address they show,
  * and a tax ID if it has one. They go to the Stripe customer, not to
- * Sandchest's database: Stripe puts them on every invoice it makes.
+ * RedNest's database: Stripe puts them on every invoice it makes.
  */
 import { taxIdTypeFor } from "@sandchest/billing";
 import { z } from "zod";

@@ -12,7 +12,7 @@ import { liveStats } from "@/server/stats";
 import "../app.css";
 import "../rig.css";
 
-export const metadata: Metadata = { title: "Get started · Sandchest" };
+export const metadata: Metadata = { title: "Get started · RedNest" };
 
 /**
  * Where "Get started" leads: the first step of recruiting, before there is

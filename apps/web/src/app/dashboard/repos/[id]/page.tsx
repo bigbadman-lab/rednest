@@ -20,7 +20,7 @@ const load = cache(async (id: string) => {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const row = await load((await params).id);
-  return { title: row ? `${row.repo.fullName} · Sandchest` : "Repository · Sandchest" };
+  return { title: row ? `${row.repo.fullName} · RedNest` : "Repository · RedNest" };
 }
 
 export default async function RepoPage({ params }: Params) {

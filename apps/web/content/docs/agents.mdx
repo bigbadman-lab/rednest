@@ -1,43 +1,43 @@
 ---
 title: Use it from your agent
-description: Everything Sandchest does works from Claude Code, Cursor, Codex or any agent, over MCP or a plain HTTP API. Setup, payment, scans, findings and settings.
+description: Everything RedNest does works from Claude Code, Cursor, Codex or any agent, over MCP or a plain HTTP API. Setup, payment, scans, findings and settings.
 ---
 
-Anything you can do in the dashboard, your agent can do for you: set Sandchest up, pay for it, start deep scans, read findings, fix them and change settings. You only step in where a person has to: approving the agent once, installing the GitHub App, and the first card payment, which Stripe takes from you directly.
+Anything you can do in the dashboard, your agent can do for you: set RedNest up, pay for it, start deep scans, read findings, fix them and change settings. You only step in where a person has to: approving the agent once, installing the GitHub App, and the first card payment, which Stripe takes from you directly.
 
 ## The quickest way
 
 Press **Set up with your agent** on the home page (or **Let your agent do it** while setting up), and paste the prompt into your agent. It reads this page and does the rest. The prompt is:
 
 ```text
-Set up Sandchest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.sandchest.com).
-Read https://www.sandchest.com/docs/agents.md and follow it. Connect to its MCP server (https://www.sandchest.com/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
-Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection, installing the GitHub App, and paying on Stripe if there are no free credits.
+Set up RedNest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.rednest.tech).
+Read https://www.rednest.tech/docs/agents.md and follow it. Connect to its MCP server (https://www.rednest.tech/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
+Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection and installing the GitHub App. Do not assume payment or free credits are available.
 ```
 
-## For agents: how to set Sandchest up
+## For agents: how to set RedNest up
 
-If you are an agent asked to set Sandchest up, do this:
+If you are an agent asked to set RedNest up, do this:
 
 1. **Connect.** Add the MCP server if your harness supports remote MCP servers ([below](#connect-over-mcp)); it signs in with OAuth and the person approves it in their browser. Otherwise use the [device flow](#connect-over-http) over HTTP and keep the API key it returns (store it as `SANDCHEST_API_KEY`).
 2. **Call `get_me`** (`GET /api/v1/me`). It returns who you act as, their GitHub accounts, and `next_steps`: what is left to do, in order. Work through them.
 3. **No accounts?** The person must install the GitHub App on their account and choose repositories: give them `links.install_github_app`. Then call `list_accounts` with `wait=50`: it returns as soon as the account shows (call it again if they're not done).
 4. **No plan?** If `free_credits` is open for the account, call `claim_free_credits`: no card needed. Otherwise call `quote_credits`, tell the person the price, and call `buy_credits`. The first purchase returns `checkout_url`: give it to the person to pay on Stripe, then call `get_billing` with `wait=50`, which returns once the plan is active. After that, `buy_credits` charges the saved card straight away.
 5. **Scan.** Recon maps every repository on its own once there is a plan. Call `start_deep_scan` for a repository (the account's first deep scan is free), then `get_scan` with `wait=50` until `done` is true.
-6. **Fix.** In a checkout of a repository, `get_findings_prompt` with `repo` set gives one prompt that covers its open findings (or `get_fix_prompt` for one at a time). Fix them there. When the fix reaches the default branch, Sandchest checks it and marks the finding fixed.
+6. **Fix.** In a checkout of a repository, `get_findings_prompt` with `repo` set gives one prompt that covers its open findings (or `get_fix_prompt` for one at a time). Fix them there. When the fix reaches the default branch, RedNest checks it and marks the finding fixed.
 
 Accounts can be named by GitHub login (`acme`) and repositories by full name (`acme/api`) everywhere an id is accepted. Changing billing or settings needs the person to be an admin of the account: an organization admin, or the owner of a personal account.
 
 ## Connect over MCP
 
-The MCP server is `https://www.sandchest.com/api/mcp` (Streamable HTTP). MCP clients sign in with OAuth on their own: the first time, a browser opens, the person signs in with GitHub and presses **Connect**.
+The MCP server is `https://www.rednest.tech/api/mcp` (Streamable HTTP). MCP clients sign in with OAuth on their own: the first time, a browser opens, the person signs in with GitHub and presses **Connect**.
 
 ```bash
 # Claude Code
-claude mcp add --transport http sandchest https://www.sandchest.com/api/mcp
+claude mcp add --transport http sandchest https://www.rednest.tech/api/mcp
 
 # Codex: add it, then sign in (opens the browser)
-codex mcp add sandchest --url https://www.sandchest.com/api/mcp
+codex mcp add sandchest --url https://www.rednest.tech/api/mcp
 codex mcp login sandchest
 ```
 
@@ -46,7 +46,7 @@ For Cursor, VS Code and other clients, add a remote server with that URL:
 ```json
 {
   "mcpServers": {
-    "sandchest": { "url": "https://www.sandchest.com/api/mcp" }
+    "sandchest": { "url": "https://www.rednest.tech/api/mcp" }
   }
 }
 ```
@@ -58,7 +58,7 @@ A client that can't do OAuth can send an [API key](#api-keys) instead, as the he
 Without MCP, use the device flow: one request starts it, the person approves in their browser, and polling returns an API key.
 
 ```bash
-curl -s -X POST https://www.sandchest.com/api/v1/auth/device \
+curl -s -X POST https://www.rednest.tech/api/v1/auth/device \
   -H 'content-type: application/json' -d '{"client_name":"My agent"}'
 ```
 
@@ -66,7 +66,7 @@ curl -s -X POST https://www.sandchest.com/api/v1/auth/device \
 {
   "device_code": "scd_…",
   "user_code": "BCDF-GHJK",
-  "verification_uri_complete": "https://www.sandchest.com/device?code=BCDFGHJK",
+  "verification_uri_complete": "https://www.rednest.tech/device?code=BCDFGHJK",
   "expires_in": 900,
   "interval": 5
 }
@@ -75,7 +75,7 @@ curl -s -X POST https://www.sandchest.com/api/v1/auth/device \
 Give the person `verification_uri_complete` (and tell them the `user_code` it shows). Then ask for the key. With `wait=50` the request holds for up to 50 seconds until they approve, so you don't need a polling loop:
 
 ```bash
-curl -s -X POST https://www.sandchest.com/api/oauth/token \
+curl -s -X POST https://www.rednest.tech/api/oauth/token \
   -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
   -d device_code=scd_… -d wait=50
 ```
@@ -85,18 +85,18 @@ It answers `authorization_pending` while they haven't approved yet (call it agai
 Then call the API with it:
 
 ```bash
-curl -s https://www.sandchest.com/api/v1/me -H "Authorization: Bearer $SANDCHEST_API_KEY"
+curl -s https://www.rednest.tech/api/v1/me -H "Authorization: Bearer $SANDCHEST_API_KEY"
 ```
 
 ## API keys
 
-API keys act as the person who made them, with exactly their access: the repositories GitHub says they can push to, and the accounts they administer. Make one for CI or a script in **Settings → Agents**, or with `create_api_key` from an agent connected with a key (MCP clients' OAuth tokens can't create keys). A key is shown once; Sandchest keeps only a hash of it. Revoke keys, and disconnect MCP clients, in **Settings → Agents** or with `revoke_api_key` (`"current"` revokes the key making the request).
+API keys act as the person who made them, with exactly their access: the repositories GitHub says they can push to, and the accounts they administer. Make one for CI or a script in **Settings → Agents**, or with `create_api_key` from an agent connected with a key (MCP clients' OAuth tokens can't create keys). A key is shown once; RedNest keeps only a hash of it. Revoke keys, and disconnect MCP clients, in **Settings → Agents** or with `revoke_api_key` (`"current"` revokes the key making the request).
 
-If the person's GitHub sign-in expires or is revoked, calls answer `403 github_reauth_required`: they sign in once at [sandchest.com/sign-in](/sign-in) and the key works again.
+If the person's GitHub sign-in expires or is revoked, calls answer `403 github_reauth_required`: they sign in once at [rednest.tech/sign-in](/sign-in) and the key works again.
 
 ## Tools and endpoints
 
-Every tool is also an HTTP endpoint under `https://www.sandchest.com/api/v1`, with JSON in and out. Path parameters, query parameters and a JSON body are all accepted for a tool's arguments. `GET /api/v1` lists them, and [`/api/v1/openapi.json`](/api/v1/openapi.json) describes them in full.
+Every tool is also an HTTP endpoint under `https://www.rednest.tech/api/v1`, with JSON in and out. Path parameters, query parameters and a JSON body are all accepted for a tool's arguments. `GET /api/v1` lists them, and [`/api/v1/openapi.json`](/api/v1/openapi.json) describes them in full.
 
 | Tool | Endpoint | What it does |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ Every tool is also an HTTP endpoint under `https://www.sandchest.com/api/v1`, wi
 | `list_api_keys` | `GET /keys` | API keys and connected MCP clients |
 | `create_api_key` | `POST /keys` | A new API key, shown once |
 | `revoke_api_key` | `DELETE /keys/{id}` | Revoke a key or disconnect a client |
-| `list_accounts` | `GET /accounts` | GitHub accounts Sandchest is installed on; `wait` while the person installs |
+| `list_accounts` | `GET /accounts` | GitHub accounts RedNest is installed on; `wait` while the person installs |
 | `get_account` | `GET /accounts/{account}` | An account's settings, hacker and repositories |
 | `update_account` | `PATCH /accounts/{account}` | Check threshold, emails, company details, first target |
 | `update_hacker` | `PATCH /accounts/{account}/hacker` | The hacker's name, look and voice |

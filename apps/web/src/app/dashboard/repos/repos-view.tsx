@@ -32,7 +32,7 @@ export function ReposView({ repos }: { repos: DashboardRepo[] }) {
       {repos.length === 0 ? (
         <div className="empty">
           <h2 className="empty-title">No repositories yet</h2>
-          <p>Choose the repositories Sandchest may read on GitHub. Each shows here once you can push to it.</p>
+          <p>Choose the repositories RedNest may read on GitHub. Each shows here once you can push to it.</p>
           <Link href="/dashboard/recruit" className="key key-primary">
             <span className="key-face">Get started</span>
           </Link>

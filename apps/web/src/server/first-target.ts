@@ -19,7 +19,7 @@ export async function startFirstTarget(userId: string, org: { id: string; settin
   if (!row || row.repo.lastDeepScanAt) return fallback;
   try {
     const { requestDeepScan } = await import("./dig");
-    const result = await requestDeepScan({ ...row.repo, org: row.org });
+    const result = await requestDeepScan({ ...row.repo, org: row.org }, "manual", { ownerUserId: userId });
     if (result.ok) return `/dashboard/scans/${result.scanId}`;
     if (result.scanId) return `/dashboard/scans/${result.scanId}`;
   } catch (error) {

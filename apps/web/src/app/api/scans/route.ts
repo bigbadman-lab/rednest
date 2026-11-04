@@ -2,7 +2,7 @@
 import { repoByFullName } from "@sandchest/db";
 import { z } from "zod";
 import { isOperator } from "@/server/auth";
-import { requestDeepScan } from "@/server/dig";
+import { requestOperatorDeepScan } from "@/server/dig";
 import { db } from "@/server/services";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const repo = await repoByFullName(db(), parsed.data.repo);
   if (!repo) return Response.json({ error: "repository not installed" }, { status: 404 });
-  const result = await requestDeepScan(repo, "manual", { operator: true });
+  const result = await requestOperatorDeepScan(repo, "manual");
   if (result.ok) return Response.json({ scanId: result.scanId }, { status: 202 });
   switch (result.reason) {
     case "not_installed":
@@ -25,8 +25,7 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "a deep scan is already running", scanId: result.scanId }, { status: 409 });
     case "too_large":
       return Response.json({ error: "repository is over 1M lines; deep scans are refused" }, { status: 422 });
-    case "no_plan":
-    case "out_of_credits":
-      return Response.json({ error: result.reason === "no_plan" ? "this account has no plan" : "out of credits", credits: result.credits }, { status: 402 });
+    default:
+      return Response.json({ error: result.reason, credits: result.credits }, { status: 402 });
   }
 }

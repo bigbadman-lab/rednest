@@ -1,4 +1,4 @@
-/** Sandchest's running totals (lines scanned, scans running), for the live counter. Public: totals only. */
+/** RedNest's running totals (lines scanned, scans running), for the live counter. Public: totals only. */
 import { liveStats, STATS_TTL_S } from "@/server/stats";
 
 export const dynamic = "force-dynamic";

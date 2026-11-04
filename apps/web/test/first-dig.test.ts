@@ -6,11 +6,22 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
-import { createDb, dashboardRepos, feedSince, scanById, schema, updateOrgSettings, upsertInstallation, type Db } from "@sandchest/db";
+import {
+  acceptOrgSponsorship,
+  createDb,
+  dashboardRepos,
+  feedSince,
+  scanById,
+  schema,
+  updateOrgSettings,
+  upsertInstallation,
+  type Db,
+} from "@sandchest/db";
 import { migrate } from "@sandchest/db/migrate";
 import type { GitHubApp } from "@sandchest/github";
 import { setAutumn } from "@/server/billing";
 import { resetConfig } from "@/server/config";
+import { setHolderEligibilityProvider } from "@/server/entitlements";
 import { startFirstTarget } from "@/server/first-target";
 import { beginScan } from "@/server/scans";
 import { setServices } from "@/server/services";
@@ -57,9 +68,16 @@ beforeAll(async () => {
   repoIds = installed.repos.map((repo) => repo.id);
   await database.insert(schema.orgAdmins).values({ userId, orgId: org.id });
   await database.insert(schema.permissionCache).values(repoIds.map((repoId) => ({ userId, repoId, permission: "admin" as const })));
+  // RedNest: recon wait + Dig require an accepted scan sponsor (not Autumn).
+  expect(
+    await acceptOrgSponsorship(database, { orgId: org.id, sponsorUserId: userId, assignedByUserId: userId }),
+  ).toMatchObject({ ok: true, created: true });
+  // After the lifetime free scan, later Digs in this suite use monthly holder quota.
+  setHolderEligibilityProvider(() => "eligible");
 });
 
 afterAll(async () => {
+  setHolderEligibilityProvider(undefined);
   setScanStarter(undefined);
   if (!available) return;
   await database.$client.end();

@@ -2,7 +2,7 @@
  * Billing and operational emails (SPEC §14): credits low or exhausted, auto
  * top-up succeeded or failed, and a scan paused by the model provider's quota.
  *
- * - Credits are watched where Sandchest already learns the balance: after
+ * - Credits are watched where RedNest already learns the balance: after
  *   each reservation, and each time it reads the org from Autumn. That
  *   covers every way the balance falls (only scans spend it) and is
  *   testable without Autumn. Auto top-up results only Autumn knows, so they
@@ -45,7 +45,7 @@ export interface NoticeOrg {
 type CreditsSnapshot = Pick<OrgBillingRow, "planId" | "credits" | "creditsResetAt" | "autoTopUp">;
 
 /**
- * Checks a balance Sandchest just learned (a reservation's answer, or a read
+ * Checks a balance RedNest just learned (a reservation's answer, or a read
  * of the org) against the org's plan, and emails the admins once when it
  * crosses down into low or exhausted. A balance back at or above the low line
  * re-arms both, as does a top-up or a renewal. `seen` is when the balance was

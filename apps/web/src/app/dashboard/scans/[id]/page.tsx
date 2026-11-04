@@ -18,7 +18,7 @@ const load = cache(async (id: string) => {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const row = await load((await params).id);
-  return { title: row ? `${title(row.scan.kind, row.scan.prNumber)} · Sandchest` : "Scan · Sandchest" };
+  return { title: row ? `${title(row.scan.kind, row.scan.prNumber)} · RedNest` : "Scan · RedNest" };
 }
 
 export default async function ScanPage({ params }: Params) {

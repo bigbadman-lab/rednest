@@ -39,6 +39,20 @@ export const ROLE_REASONING: Readonly<Record<Role, ReasoningEffort | undefined>>
   structure: undefined,
 };
 
+/**
+ * Whether `/chat/completions` should include `reasoning_effort` for this model.
+ *
+ * OpenAI GPT-4.1 (and its mini/nano dated variants) reject the parameter.
+ * Everything else keeps the existing behaviour: role defaults and overrides
+ * still apply for reasoning-capable and OpenAI-compatible endpoints that
+ * accept the field (including custom model ids).
+ */
+export function modelSupportsReasoningEffort(model: string): boolean {
+  // Gateways sometimes prefix the id (`openai/gpt-4.1`); compare the leaf name.
+  const id = model.trim().toLowerCase().split("/").pop() ?? "";
+  return !/^gpt-4\.1(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(id);
+}
+
 const required = z.string().trim().min(1, "is required");
 const optionalModel = z.string().trim().min(1).optional();
 

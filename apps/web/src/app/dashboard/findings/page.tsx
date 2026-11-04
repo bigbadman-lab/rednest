@@ -5,7 +5,7 @@ import { viewer } from "@/server/access";
 import { db } from "@/server/db";
 import { FindingsView, parse, type Query } from "./findings-view";
 
-export const metadata: Metadata = { title: "Findings · Sandchest" };
+export const metadata: Metadata = { title: "Findings · RedNest" };
 
 export default async function FindingsPage({ searchParams }: { searchParams: Promise<Query> }) {
   const [user, query] = await Promise.all([viewer(), searchParams]);

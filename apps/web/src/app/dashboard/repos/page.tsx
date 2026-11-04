@@ -5,7 +5,7 @@ import { viewer } from "@/server/access";
 import { db } from "@/server/db";
 import { ReposView } from "./repos-view";
 
-export const metadata: Metadata = { title: "Repos · Sandchest" };
+export const metadata: Metadata = { title: "Repos · RedNest" };
 
 export default async function ReposPage() {
   const user = await viewer();

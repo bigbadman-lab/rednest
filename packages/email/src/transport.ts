@@ -25,7 +25,7 @@ export interface MailerConfig {
 const noop: Mailer = { enabled: false, send: async () => {} };
 
 export function createMailer(config: MailerConfig, fetchImpl: typeof fetch = fetch): Mailer {
-  const from = config.EMAIL_FROM ?? "Sandchest <notifications@sandchest.local>";
+  const from = config.EMAIL_FROM ?? "RedNest <notifications@rednest.local>";
   if (config.RESEND_API_KEY) {
     const key = config.RESEND_API_KEY;
     return {

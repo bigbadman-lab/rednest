@@ -82,7 +82,13 @@ const forgetCode = {
 export async function disableRepos(database: Db, githubRepoIds: number[]): Promise<void> {
   if (githubRepoIds.length === 0) return;
   await database.transaction(async (tx) => {
-    const disabled = await tx.update(repos).set({ enabled: false }).where(inArray(repos.githubRepoId, githubRepoIds)).returning({ id: repos.id });
+    // Never disable Quick Scan shadow rows: they use synthetic github_repo_ids,
+    // but filter by source so installed uninstalls stay precise.
+    const disabled = await tx
+      .update(repos)
+      .set({ enabled: false })
+      .where(and(inArray(repos.githubRepoId, githubRepoIds), eq(repos.source, "installed")))
+      .returning({ id: repos.id });
     if (disabled.length > 0) await tx.update(findings).set(forgetCode).where(inArray(findings.repoId, disabled.map((r) => r.id)));
   });
 }
@@ -106,12 +112,13 @@ export async function orgByInstallation(database: Db, installationId: number): P
   return database.query.orgs.findFirst({ where: eq(orgs.installationId, installationId) });
 }
 
+/** Installed App repository only — Quick Scan rows never answer webhook lookups. */
 export async function repoByGithubId(database: Db, githubRepoId: number): Promise<(Repo & { org: Org }) | undefined> {
-  return database.query.repos.findFirst({ where: eq(repos.githubRepoId, githubRepoId), with: { org: true } });
+  return database.query.repos.findFirst({ where: and(eq(repos.githubRepoId, githubRepoId), eq(repos.source, "installed")), with: { org: true } });
 }
 
 export async function repoByFullName(database: Db, fullName: string): Promise<(Repo & { org: Org }) | undefined> {
-  return database.query.repos.findFirst({ where: eq(repos.fullName, fullName), with: { org: true } });
+  return database.query.repos.findFirst({ where: and(eq(repos.fullName, fullName), eq(repos.source, "installed")), with: { org: true } });
 }
 
 // ---- Threat models ---------------------------------------------------------

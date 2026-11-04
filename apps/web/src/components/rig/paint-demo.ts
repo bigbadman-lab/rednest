@@ -51,7 +51,7 @@ interface Chest {
 
 function loadChest(): Promise<Chest> {
   const icon = new Image();
-  icon.src = "/sandchest-icon-flat.svg";
+  icon.src = "/rednest-icon.svg";
   return icon.decode().then(() => {
     const art = document.createElement("canvas");
     art.width = SPRITE_W;

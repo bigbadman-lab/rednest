@@ -1,5 +1,6 @@
 import type { OrgBillingRow, SettingsOrg, userAgentAccess } from "@sandchest/db";
 import { AgentPromptButton } from "@/components/agent-prompt-button";
+import { AcceptSponsorshipForm } from "@/components/app/accept-sponsorship";
 import { CreateKeyForm } from "@/components/app/agent-keys";
 import { Avatar } from "@/components/app/avatar";
 import { BillingPanel } from "@/components/app/billing-panel";
@@ -49,7 +50,7 @@ export function SettingsView({
       {orgs.length === 0 && (
         <div className="empty">
           <h2 className="empty-title">No accounts yet</h2>
-          <p>Settings belong to each GitHub account Sandchest is installed on. Install it to get started.</p>
+          <p>Settings belong to each GitHub account RedNest is installed on. Install it to get started.</p>
           <InstallKey />
         </div>
       )}
@@ -66,6 +67,22 @@ export function SettingsView({
           </div>
           <div className="settings-form">
             {billing && <BillingPanel org={org} billing={billing[index] ?? null} />}
+            {org.sponsored ? (
+              <div>
+                <p className="field-legend">Scan sponsorship</p>
+                <p className="field-help">This account has an accepted scan sponsor. Automatic pull-request reviews and repository mapping may run.</p>
+              </div>
+            ) : org.admin ? (
+              <AcceptSponsorshipForm orgId={org.id} orgLogin={org.login} />
+            ) : (
+              <div>
+                <p className="field-legend">Scan sponsorship</p>
+                <p className="field-help">
+                  {org.login} has no scan sponsor yet. A GitHub administrator must accept sponsorship here before automatic scans and the first dig
+                  (when the repository still needs mapping) can run.
+                </p>
+              </div>
+            )}
             <OrgSettingsForm orgId={org.id} threshold={org.settings.checkThreshold} email={org.settings.emailNotifications !== false} admin={org.admin} />
             <div>
               <p className="field-legend">Hacker</p>
@@ -113,7 +130,7 @@ export function SettingsView({
             <p className="field-legend">Connect an agent</p>
             <p className="field-help">
               Paste this prompt into Claude Code, Cursor, Codex or any agent, and it connects itself: you approve it once. Or add the MCP server{" "}
-              <code>{`${appUrl}/api/mcp`}</code> to your agent. <Link className="quiet" href="/docs/agents">How agents use Sandchest</Link>
+              <code>{`${appUrl}/api/mcp`}</code> to your agent. <Link className="quiet" href="/docs/agents">How agents use RedNest</Link>
             </p>
             <AgentPromptButton className="key key-primary" track="settings-agent-prompt" label="Copy prompt for your agent" />
           </div>

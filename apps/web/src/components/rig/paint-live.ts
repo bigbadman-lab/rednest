@@ -129,11 +129,11 @@ function topBar(kit: Kit, t: number, title: string, status: string, elapsed: str
   kit.text(right, 27, elapsed, { px: 18, kind: "bold", align: "right" });
   kit.text(right - 90, 27, status, { px: 18, align: "right", alpha: 0.85 });
   if (live && Math.floor(t * 1.5) % 2 === 0) {
-    kit.ctx.fillStyle = "#ff3b2f";
+    kit.ctx.fillStyle = "#f50002";
     kit.ctx.beginPath();
     kit.ctx.arc(right - 250, 20, 7, 0, Math.PI * 2);
     kit.ctx.fill();
-    kit.text(right - 236, 27, "REC", { px: 16, kind: "bold", color: "#ff3b2f" });
+    kit.text(right - 236, 27, "REC", { px: 16, kind: "bold", color: "#f50002" });
   }
 }
 
@@ -207,7 +207,7 @@ function bottomBar(kit: Kit, m: LiveModel) {
   const done = m.track.filter((s) => s.state === "done").length;
   kit.text(20, kit.H - 14, `${shellUser(m.profile.handle)}  ${m.kind}`, { px: 16, kind: "bold" });
   kit.meter(520, kit.H - 13, 30, m.track.length ? done / m.track.length : 0, 16);
-  kit.text(kit.W - 20, kit.H - 14, "sandchest", { px: 16, alpha: 0.6, align: "right" });
+  kit.text(kit.W - 20, kit.H - 14, "rednest", { px: 16, alpha: 0.6, align: "right" });
 }
 
 function overlay(kit: Kit, t: number, title: string, note: string, spinner: boolean) {

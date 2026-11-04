@@ -1,12 +1,12 @@
 /*
- * The dashboard. Same dark ground, gold and pixel grid as the landing page,
+ * The dashboard. Same dark ground, red accents and pixel grid as the landing page,
  * quieter: hairline seams instead of boxes, one display face for page
  * titles, and severity shown as a four-pixel heat meter.
  */
 
 :root {
-  --critical: #ff5a36;
-  --high: var(--color-ember);
+  --critical: #f50002;
+  --high: #c40002;
   --medium: var(--color-honey);
   --low: var(--color-dust);
   --fixed: #9cc46b;
@@ -2883,4 +2883,16 @@ html:not([data-js]) .no-js-submit {
    where the page shows nothing. */
 [skullet-loading] details:not([open]) > :not(summary) {
   display: none !important;
+}
+
+/* Public URL Quick Scan — sits above the scans list without a card chrome. */
+.quick-scan {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1.75rem;
+  max-width: 36rem;
+}
+
+.quick-scan .key {
+  justify-self: start;
 }

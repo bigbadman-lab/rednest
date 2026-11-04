@@ -3,7 +3,7 @@ title: Findings & severity
 description: What a finding contains, how severity and confidence are decided, and what to do with one.
 ---
 
-A finding is a vulnerability Sandchest can back with evidence. If it can't show how an attacker gets in, the path through your code and what they get, it doesn't report it.
+A finding is a vulnerability RedNest can back with evidence. If it can't show how an attacker gets in, the path through your code and what they get, it doesn't report it.
 
 ## What a finding contains
 
@@ -33,7 +33,7 @@ Two rules keep severity honest:
 - A finding has to harm someone other than the attacker. Breaking your own account isn't a vulnerability.
 - An endpoint that is public by design and has no rate limit is medium at most. It is rated higher only when the missing limit enables something worse, such as brute-forcing logins or running up your bills.
 
-Sandchest uses CWE tags but not CVSS scores. Severity is shown as a four-step heat meter in the dashboard.
+RedNest uses CWE tags but not CVSS scores. Severity is shown as a four-step heat meter in the dashboard.
 
 ## Confidence
 
@@ -45,7 +45,7 @@ Low-confidence findings are hidden by default. They are never posted on pull req
 
 | Status | Meaning |
 | --- | --- |
-| Open | Still exploitable, as far as Sandchest knows |
+| Open | Still exploitable, as far as RedNest knows |
 | Fixed | A fix check showed the attack path is gone, or someone pressed **Mark fixed** |
 | Dismissed | Someone dismissed it as a false positive, an accepted risk, or won't fix |
 
@@ -65,7 +65,7 @@ The finding itself stays, so your history and counts survive. A reopened finding
 
 ## Duplicates
 
-The same vulnerability found again, by a later pull request or deep scan, updates the existing finding instead of creating a new one. Sandchest recognizes it by the kind of issue, the file and function with the vulnerable code, and that code itself, not by line numbers. Moving code within a file doesn't create a duplicate, but moving it to another file or function, or editing the vulnerable line, can show up as a new finding.
+The same vulnerability found again, by a later pull request or deep scan, updates the existing finding instead of creating a new one. RedNest recognizes it by the kind of issue, the file and function with the vulnerable code, and that code itself, not by line numbers. Moving code within a file doesn't create a duplicate, but moving it to another file or function, or editing the vulnerable line, can show up as a new finding.
 
 ## The Findings screen
 

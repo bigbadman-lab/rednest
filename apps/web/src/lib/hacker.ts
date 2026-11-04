@@ -44,7 +44,7 @@ export const PHOSPHORS: readonly Swatch[] = [
   { id: "amber", label: "Amber", color: "#ffb02e" },
   { id: "green", label: "Green", color: "#3dff8f" },
   { id: "cyan", label: "Cyan", color: "#45e3ff" },
-  { id: "red", label: "Red", color: "#ff4b3e" },
+  { id: "red", label: "Red", color: "#f50002" },
   { id: "ice", label: "Ice", color: "#dfe9ff" },
 ];
 
@@ -65,7 +65,7 @@ export const ROOMS: readonly Room[] = [
 
 export const STICKERS: readonly Choice[] = [
   { id: "skull", label: "Skull" },
-  { id: "chest", label: "Sandchest" },
+  { id: "chest", label: "RedNest" },
   { id: "duck", label: "Rubber duck" },
   { id: "zeroday", label: "0day" },
   { id: "padlock", label: "Broken lock" },

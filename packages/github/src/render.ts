@@ -1,5 +1,5 @@
 /**
- * What Sandchest posts on GitHub. Public repositories get counts and a link
+ * What RedNest posts on GitHub. Public repositories get counts and a link
  * only: their Checks and comments are public, so details stay in the
  * dashboard.
  */
@@ -75,7 +75,7 @@ export function checkResult(input: CheckInput): { conclusion: CheckConclusion; o
  */
 export function notReviewed(reason: "no_plan" | "out_of_credits", billingUrl: string, credits?: number): { conclusion: CheckConclusion; output: CheckOutput } {
   if (reason === "no_plan") {
-    return { conclusion: "neutral", output: { title: "Not reviewed: no plan", summary: `Sandchest needs a plan before it reviews pull requests. [Pick a plan →](${billingUrl})` } };
+    return { conclusion: "neutral", output: { title: "Not reviewed: no plan", summary: `RedNest needs a plan before it reviews pull requests. [Pick a plan →](${billingUrl})` } };
   }
   const need = credits ? ` This review needs ${credits} ${credits === 1 ? "credit" : "credits"}.` : "";
   return { conclusion: "neutral", output: { title: "Out of credits", summary: `This change was not reviewed.${need} [Top up to keep reviewing →](${billingUrl})` } };
@@ -86,7 +86,7 @@ export function publicSentence(findings: Finding[]): string {
   const worst = ORDER.find((severity) => findings.some((f) => f.severity === severity))!;
   const count = findings.filter((f) => f.severity === worst).length;
   const more = findings.length - count;
-  const head = `Sandchest found ${count} ${worst}-severity ${count === 1 ? "issue" : "issues"}`;
+  const head = `RedNest found ${count} ${worst}-severity ${count === 1 ? "issue" : "issues"}`;
   return more > 0 ? `${head} and ${more} more.` : `${head}.`;
 }
 
@@ -108,7 +108,7 @@ export function reviewComment(finding: Finding): string {
 
 /** Review body: a summary, plus findings whose lines are outside the diff. */
 export function reviewBody(findings: Finding[], unplaced: Finding[], detailsUrl: string): string {
-  const head = `Sandchest found ${findings.length} ${findings.length === 1 ? "issue" : "issues"} in this change (${countBySeverity(findings)}). [Full details →](${detailsUrl})`;
+  const head = `RedNest found ${findings.length} ${findings.length === 1 ? "issue" : "issues"} in this change (${countBySeverity(findings)}). [Full details →](${detailsUrl})`;
   if (unplaced.length === 0) return head;
   const rest = unplaced.map((finding) => `<details><summary><b>${LABEL[finding.severity]}</b> ${escapeHtml(finding.title)}</summary>\n\n${reviewComment(finding)}\n\n</details>`);
   return `${head}\n\nThese could not be placed on the diff:\n\n${rest.join("\n\n")}`;

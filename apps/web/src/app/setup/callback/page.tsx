@@ -7,7 +7,7 @@ import { SetupShell } from "@/components/app/setup-shell";
 import { githubApiUrl, SETUP_COOKIE, sessionValid, setupNeeded, stateValid } from "@/server/setup";
 import "../../app.css";
 
-export const metadata: Metadata = { title: "Your GitHub App · Sandchest", referrer: "no-referrer", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Your GitHub App · RedNest", referrer: "no-referrer", robots: { index: false, follow: false } };
 
 /**
  * Where GitHub sends the operator after creating the App. The code is
@@ -39,7 +39,7 @@ export default async function SetupCallbackPage({ searchParams }: { searchParams
       <Problem title={status === 404 || status === 422 ? "Already shown." : "GitHub didn’t answer."}>
         {status === 404 || status === 422
           ? "GitHub hands over an App’s keys once, within an hour of creating it, and this code has been used or has expired. If you didn’t save them, open the App’s settings on GitHub: generate a new private key and client secret, set a webhook secret, and add them to the environment as setup describes."
-          : "Sandchest couldn’t get the App’s keys from GitHub. Reload this page within the hour to try again."}
+          : "RedNest couldn’t get the App’s keys from GitHub. Reload this page within the hour to try again."}
       </Problem>
     );
   }

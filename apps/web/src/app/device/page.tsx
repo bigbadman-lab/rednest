@@ -13,7 +13,7 @@ import "../app.css";
 // "same-origin", not "no-referrer": the URL (with its code) still never leaves the site, but a button pressed
 // before the page's script loads posts a plain form, and under no-referrer the browser sends `Origin: null`,
 // which Next refuses as a cross-site Server Action.
-export const metadata: Metadata = { title: "Connect an agent · Sandchest", referrer: "same-origin", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Connect an agent · RedNest", referrer: "same-origin", robots: { index: false, follow: false } };
 
 /**
  * Where a person approves an agent that asked to connect with the device
@@ -35,7 +35,7 @@ export default async function DevicePage({ searchParams }: { searchParams: Promi
         <p className="sign-in-body">Go back to your agent: it takes it from here.</p>
         {accounts.length === 0 && (
           <>
-            <p className="sign-in-body">One thing only you can do: install Sandchest on GitHub and choose the repositories it may read. Your agent sees them as soon as you’re done.</p>
+            <p className="sign-in-body">One thing only you can do: install RedNest on GitHub and choose the repositories it may read. Your agent sees them as soon as you’re done.</p>
             <div className="setup-cta">
               <InstallKey />
             </div>
@@ -78,7 +78,7 @@ export default async function DevicePage({ searchParams }: { searchParams: Promi
   return (
     <SetupShell title="Connect an agent?">
       <p className="sign-in-body">
-        <strong>{grant.clientName}</strong> wants to use Sandchest as <strong>{user.login ?? user.name}</strong>. Check your agent shows this code:
+        <strong>{grant.clientName}</strong> wants to use RedNest as <strong>{user.login ?? user.name}</strong>. Check your agent shows this code:
       </p>
       <p className="agent-code">{formatUserCode(code)}</p>
       <AgentAbilities />

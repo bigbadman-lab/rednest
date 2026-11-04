@@ -8,18 +8,18 @@
  */
 export const legal = {
   /** The company that runs the hosted service and signs the contract. */
-  entity: "Cap Software, Inc.",
+  entity: "[RedNest legal entity]",
   /** Registered address, on one line. */
-  address: "1111B Governors Ave, Dover, DE 19904, USA",
+  address: "[Registered address]",
   /** Where the company is incorporated. */
-  jurisdiction: "Delaware, USA",
+  jurisdiction: "[Jurisdiction]",
   /** Law that governs the terms, and whose courts hear disputes. */
-  governingLaw: "the laws of the State of Delaware, USA",
-  courts: "the state and federal courts located in Delaware, USA",
+  governingLaw: "[Governing law]",
+  courts: "[Courts]",
   /** One address for general, privacy, security and legal questions. */
-  email: "hello@cap.so",
+  email: "hello@rednest.tech",
   /** Shown on all three pages. Change it whenever a policy changes. */
-  lastUpdated: "November 3, 2026",
+  lastUpdated: "November 4, 2026",
 } as const;
 
 /** A value that hasn't been filled in yet. */

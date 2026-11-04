@@ -1369,7 +1369,7 @@ button.onboard-leave {
   background: repeating-linear-gradient(180deg, #221c15 0 2.6rem, transparent 2.6rem 4rem);
 }
 
-/* The running total: every line Sandchest has read, rolling up as scans finish. */
+/* The running total: every line RedNest has read, rolling up as scans finish. */
 /*
  * The running count, as a piece in the empty side of the screen: one number
  * filling the width beside the centred panel (its look is in globals.css,

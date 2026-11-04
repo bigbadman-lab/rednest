@@ -1,5 +1,5 @@
 /**
- * Sandchest's running totals, for the counter shown where people decide to
+ * RedNest's running totals, for the counter shown where people decide to
  * pay: lines read across every completed scan, and scans running right now.
  * Totals only, nothing about any org. One copy for everyone, read from the
  * database at most every ten minutes.

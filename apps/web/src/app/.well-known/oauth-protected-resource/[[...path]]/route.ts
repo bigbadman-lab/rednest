@@ -1,6 +1,6 @@
 /**
  * Protected resource metadata (RFC 9728): which authorization server issues
- * tokens for Sandchest. MCP clients ask for it under the MCP server's path
+ * tokens for RedNest. MCP clients ask for it under the MCP server's path
  * (`/.well-known/oauth-protected-resource/api/mcp`); the bare one covers the API.
  */
 import { appUrl } from "@/server/agent/run";

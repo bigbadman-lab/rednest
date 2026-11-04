@@ -6,7 +6,7 @@ import { signIn } from "@/server/actions";
 import { setupNeeded } from "@/server/setup";
 import "../app.css";
 
-export const metadata: Metadata = { title: "Sign in · Sandchest" };
+export const metadata: Metadata = { title: "Sign in · RedNest" };
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ expired?: string; error?: string; next?: string }> }) {
   const { expired, error, next } = await searchParams;
@@ -19,10 +19,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main className="sign-in">
       <div className="shell">
-        <a href="/" className="sign-in-mark" aria-label="Sandchest home">
-          <img src="/sandchest-logo-dark.svg" alt="Sandchest" width={184} height={34} />
+        <a href="/" className="sign-in-mark" aria-label="RedNest home">
+          <img src="/red.png" alt="RedNest" width={184} height={46} />
         </a>
-        <h1 className="sign-in-title">Sign in to Sandchest.</h1>
+        <h1 className="sign-in-title">Sign in to RedNest.</h1>
         <p className="sign-in-body">
           Use your GitHub account. You’ll see findings for the repositories you can push to, nothing else.
         </p>
@@ -45,7 +45,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </button>
         </form>
         <p className="sign-in-note">
-          Sandchest reads code only in a temporary workspace during a scan and never stores it.
+          RedNest reads code only in a temporary workspace during a scan and never stores it.
         </p>
       </div>
     </main>

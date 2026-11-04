@@ -10,14 +10,19 @@ export function siteUrl(env: Record<string, string | undefined> = process.env): 
 }
 
 export const site = {
-  name: "Sandchest",
-  title: "Sandchest — Add a hacker to your team",
+  name: "RedNest",
+  title: "RedNest — Autonomous AI code security scanning",
   description:
-    "Sandchest acts like a real hacker embedded in your team, using abliterated, unrestricted models to find real vulnerabilities in your code before attackers do.",
+    "RedNest is an autonomous AI-powered code security platform: connect GitHub, scan repositories, and get actionable vulnerability findings with attack paths and fix guidance.",
   url: siteUrl() ?? "http://localhost:3000",
-  githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/CapSoftware/Sandchest",
-  /** The company behind the hosted service, credited in the footer. */
-  parent: { name: "Cap", url: "https://cap.so" },
+  githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/bigbadman-lab/rednest",
+  /** Official X (Twitter) account. */
+  xUrl: "https://x.com/rednestai",
+  /**
+   * Attribution for the open-source lineage. The product UI is RedNest;
+   * the codebase is AGPL-licensed and derived from Sandchest.
+   */
+  parent: { name: "Sandchest (AGPL)", url: "https://github.com/CapSoftware/Sandchest" },
   links: {
     getStarted: "/get-started",
     signIn: "/sign-in",
@@ -40,30 +45,22 @@ export const site = {
  * Logo and icon files keep their names, and Cloudflare tells browsers to cache
  * them for hours. Bump this when the art changes so visitors fetch the new files.
  */
-const BRAND_VERSION = "4";
+const BRAND_VERSION = "11";
 
 export const brandAsset = (path: string) => `${path}?v=${BRAND_VERSION}`;
 
 /**
- * The link preview, drawn by `bun run og`: the hero chest being hacked open
- * beside the wordmark. Networks that play og:video (Discord, iMessage,
- * Telegram, Facebook) loop the video; the rest show the still, which is also
- * the video's poster. Next resolves image URLs against metadataBase but not
- * video URLs, so the video's is absolute here.
+ * The link preview. Prefer a static OG image; video remains optional if present.
  */
 export const socialImage = {
-  url: brandAsset("/og.png"),
+  url: brandAsset("/redmeta.jpg"),
   width: 1200,
   height: 630,
-  alt: "The Sandchest chest burning open beside the line “Add a hacker to your team.”",
+  alt: "RedNest — autonomous AI code security scanning for GitHub repositories.",
 };
 
-const socialVideoUrl = new URL(brandAsset("/og.mp4"), site.url).href;
-
-export const socialVideo = {
-  url: socialVideoUrl,
-  ...(socialVideoUrl.startsWith("https:") && { secureUrl: socialVideoUrl }),
-  type: "video/mp4",
-  width: 1200,
-  height: 630,
-};
+/**
+ * OG video still uses the Sandchest chest animation until a RedNest original
+ * is supplied. Omit it from metadata so shares do not show outdated branding.
+ */
+export const socialVideo = null;

@@ -22,7 +22,7 @@ function createAuth() {
     throw new Error("Sign-in needs BETTER_AUTH_SECRET, GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET.");
   }
   return betterAuth({
-    appName: "Sandchest",
+    appName: "RedNest",
     baseURL: settings.SANDCHEST_APP_URL,
     secret: settings.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db(), {

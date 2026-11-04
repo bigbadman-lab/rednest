@@ -29,14 +29,14 @@ const sandchest = {
   settings: [
     { settings: { foreground: "#f3e5c8" } },
     { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: "#a69479" } },
-    { scope: ["keyword", "storage", "keyword.operator.new", "keyword.control"], settings: { foreground: "#fec242" } },
+    { scope: ["keyword", "storage", "keyword.operator.new", "keyword.control"], settings: { foreground: "#f50002" } },
     { scope: ["string", "string.quoted", "markup.inline.raw"], settings: { foreground: "#fdd363" } },
     { scope: ["constant", "constant.numeric", "constant.language", "support.constant"], settings: { foreground: "#ff9f19" } },
     { scope: ["entity.name.function", "support.function", "entity.name.tag"], settings: { foreground: "#fff3dc" } },
     { scope: ["variable.parameter", "variable.other.property", "support.type.property-name", "entity.other.attribute-name"], settings: { foreground: "#c2b293" } },
     { scope: ["punctuation", "meta.brace", "keyword.operator"], settings: { foreground: "#c2b293" } },
     { scope: ["entity.name.type", "support.type", "support.class"], settings: { foreground: "#fea121" } },
-    { scope: ["markup.heading", "entity.name.section"], settings: { foreground: "#fec242" } },
+    { scope: ["markup.heading", "entity.name.section"], settings: { foreground: "#f50002" } },
     { scope: ["invalid"], settings: { foreground: "#d76839" } },
   ],
 };

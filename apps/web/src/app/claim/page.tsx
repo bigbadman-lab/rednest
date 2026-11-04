@@ -1,5 +1,4 @@
-import { DEEP_SCAN_TIERS, PR_REVIEW_TIERS } from "@sandchest/billing/costs";
-import { CREDIT_PRICE, FREE_CREDITS, PLAN } from "@sandchest/billing/plans";
+import { FREE_CREDITS } from "@sandchest/billing/plans";
 import type { Metadata } from "next";
 import { ChestStage } from "@/components/chest-stage";
 import { FindingStrip } from "@/components/finding-strip";
@@ -10,13 +9,12 @@ import { LiveLines } from "@/components/recruit/live-lines";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 
 const CREDITS = FREE_CREDITS.credits;
-const WORTH = CREDITS * CREDIT_PRICE;
 /** Where the key goes: it remembers the claim, then starts recruiting (signing in first if needed). */
 const CLAIM = "/claim/start";
 
 export const metadata: Metadata = {
-  title: `Claim $${WORTH} of free credits · Sandchest`,
-  description: `Test Sandchest on your own code: ${CREDITS} free credits, no card. Your hacker reviews pull requests and deep scans whole repositories for real, exploitable vulnerabilities.`,
+  title: `Tester access · RedNest`,
+  description: `Invite-only tester access for RedNest on your own GitHub repositories.`,
   // A link for testers, not a page to find in search.
   robots: { index: false, follow: false },
   alternates: { canonical: "/claim" },
@@ -28,7 +26,6 @@ export const metadata: Metadata = {
  * `server/free-credits.ts`).
  */
 export default function ClaimPage() {
-  const reviews = Math.floor(CREDITS / PR_REVIEW_TIERS[0]!.credits);
   return (
     <div className="page">
       <SiteHeader visitor="signed-out" />
@@ -40,15 +37,15 @@ export default function ClaimPage() {
             For testers
           </p>
           <h1 id="hero-title" className="hero-title">
-            Claim ${WORTH} of free credits.
+            Tester access.
           </h1>
           <p className="hero-lede">
-            Test Sandchest on your own code. {CREDITS} credits, on us, with no card: your hacker maps your repositories,
-            deep scans one end to end, and reviews your pull requests the way an attacker would.
+            Invite-only access to try RedNest on your own repositories: GitHub-connected scanning, pull request reviews,
+            and deep scans with actionable findings. Availability is limited.
           </p>
           <div className="hero-actions">
-            <HeroKey href={CLAIM} track="claim-hero">Claim {CREDITS} free credits</HeroKey>
-            <p className="claim-fine">No card needed. One claim per GitHub account.</p>
+            <HeroKey href={CLAIM} track="claim-hero">Continue as a tester</HeroKey>
+            <p className="claim-fine">Requires a GitHub account. Access rules are enforced at claim time.</p>
           </div>
         </section>
 
@@ -57,26 +54,26 @@ export default function ClaimPage() {
 
         <section className="section" aria-labelledby="perks-title">
           <h2 id="perks-title" className="section-title">
-            What {CREDITS} credits get you
+            What tester access covers
           </h2>
           <ul className="claim-perks">
             <li className="claim-perk">
-              <span className="claim-perk-n">{reviews}</span>
+              <span className="claim-perk-n">PR</span>
               <span className="claim-perk-name">pull request reviews</span>
-              <span className="claim-perk-note">Most reviews cost {PR_REVIEW_TIERS[0]!.credits} credit. Each one reads the change the way an attacker would.</span>
+              <span className="claim-perk-note">Reviews use the existing credits module ({CREDITS} credits on claim). Each one reads the change the way an attacker would.</span>
             </li>
             <li className="claim-perk">
-              <span className="claim-perk-n">1st</span>
-              <span className="claim-perk-name">deep scan, free</span>
+              <span className="claim-perk-n">Deep</span>
+              <span className="claim-perk-name">repository scans</span>
               <span className="claim-perk-note">
-                Your first scan of a whole repository costs nothing. After that, {DEEP_SCAN_TIERS[0]!.credits} to {DEEP_SCAN_TIERS.at(-1)!.credits} credits by size.
+                Deep scans cover whole repositories and return actionable findings with attack paths and fix guidance.
               </span>
             </li>
             <li className="claim-perk">
-              <span className="claim-perk-n">$0</span>
-              <span className="claim-perk-name">until you want more</span>
+              <span className="claim-perk-n">Invite</span>
+              <span className="claim-perk-name">tester access</span>
               <span className="claim-perk-note">
-                No card to start. When the credits run out, join for ${PLAN.price} a month and keep any left over.
+                Access is invite-only. Payment and token-based access are being revised and are not advertised as public offers here.
               </span>
             </li>
           </ul>
@@ -87,7 +84,7 @@ export default function ClaimPage() {
             Find the exploit before someone else does
           </h2>
           <p className="pitch-body">
-            Attackers already use abliterated models to scan code for holes. Sandchest runs the same models on your
+            Attackers already use abliterated models to scan code for holes. RedNest runs the same models on your
             repos and sends you what it finds. Every finding comes with:
           </p>
           <ul className="pitch-list">

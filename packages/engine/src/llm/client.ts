@@ -1,4 +1,4 @@
-import { ROLE_REASONING, type LlmConfig } from "./config";
+import { ROLE_REASONING, modelSupportsReasoningEffort, type LlmConfig } from "./config";
 import { LlmError, errorFromResponse } from "./errors";
 import { readSse } from "./sse";
 import type { AssistantMessage, ChatDelta, ChatRequest, ChatResult, ToolCall, ToolChoice, Usage } from "./types";
@@ -112,8 +112,9 @@ export function createLlmClient(config: LlmConfig, options: LlmClientOptions = {
 }
 
 function buildBody(config: LlmConfig, request: ChatRequest): string {
+  const model = config.models?.[request.role] ?? config.model;
   const body: Record<string, unknown> = {
-    model: config.models?.[request.role] ?? config.model,
+    model,
     messages: request.messages,
     stream: true,
     stream_options: { include_usage: true },
@@ -131,8 +132,9 @@ function buildBody(config: LlmConfig, request: ChatRequest): string {
   const seed = request.seed ?? config.seed;
   if (seed !== undefined) body.seed = seed;
 
+  // GPT-4.1 rejects reasoning_effort; other models keep role defaults / overrides.
   const effort = request.reasoningEffort === undefined ? ROLE_REASONING[request.role] : request.reasoningEffort;
-  if (effort) body.reasoning_effort = effort;
+  if (effort && modelSupportsReasoningEffort(model)) body.reasoning_effort = effort;
 
   return JSON.stringify(body);
 }

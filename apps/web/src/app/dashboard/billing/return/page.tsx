@@ -8,7 +8,7 @@ import { track } from "@/server/analytics";
 import { autumn, syncBilling } from "@/server/billing";
 import { db } from "@/server/db";
 
-export const metadata: Metadata = { title: "Billing · Sandchest" };
+export const metadata: Metadata = { title: "Billing · RedNest" };
 
 /**
  * Back from Stripe (Checkout, a card step or the billing portal): reads the

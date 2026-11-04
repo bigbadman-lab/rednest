@@ -21,7 +21,7 @@ const HEIGHT = 0.2;
 const CENTRE = EYES.clone().addScaledVector(FORWARD, 0.04).addScaledVector(UP, -0.022);
 const GLOW = EYES.clone().addScaledVector(FORWARD, 0.06);
 
-/** The face is drawn on a grid of big pixels, like the Sandchest mark. */
+/** The face is drawn on a grid of big pixels, like the RedNest mark. */
 const COLUMNS = 20;
 const ROWS = 25;
 const CELL = 8;

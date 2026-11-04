@@ -99,6 +99,20 @@
       "when": 1793731533987,
       "tag": "0013_agents",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793800000000,
+      "tag": "0014_rednest_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0015_quick_scans",
+      "breakpoints": true
     }
   ]
 }

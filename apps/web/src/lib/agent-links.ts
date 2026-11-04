@@ -52,7 +52,7 @@ export interface AgentOpening {
  * What a link carries when its prompt has to be pasted: T3 Code and Cursor
  * need some prompt in the link. It reads as the lead-in to what follows it.
  */
-export const PASTE_LEAD = "Here is a security fix prompt from Sandchest:";
+export const PASTE_LEAD = "Here is a security fix prompt from RedNest:";
 
 /** How to open `app` with `prompt` in `repo`: in the link when it fits, otherwise pasted. */
 export function agentOpening(app: AgentApp, prompt: string, repo?: string): AgentOpening {

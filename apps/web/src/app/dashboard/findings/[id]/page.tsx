@@ -17,7 +17,7 @@ const load = cache(async (id: string) => {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const row = await load((await params).id);
-  return { title: row ? `${row.finding.title} · Sandchest` : "Finding · Sandchest" };
+  return { title: row ? `${row.finding.title} · RedNest` : "Finding · RedNest" };
 }
 
 export default async function FindingPage({ params }: Params) {

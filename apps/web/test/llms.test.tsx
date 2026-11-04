@@ -62,7 +62,7 @@ describe("page Markdown", () => {
 describe("llms.txt and llms-full.txt", () => {
   test("the index links every page's Markdown, in order", () => {
     const index = renderLlmsIndex(pages, base, false);
-    expect(index.startsWith("# Sandchest\n\n> ")).toBe(true);
+    expect(index.startsWith("# RedNest\n\n> ")).toBe(true);
     const links = [...index.matchAll(/^- \[([^\]]+)\]\(([^)]+)\)/gm)].map((m) => [m[1], m[2]]);
     expect(links.slice(0, 2)).toEqual([
       ["Getting started", `${base}/docs.md`],

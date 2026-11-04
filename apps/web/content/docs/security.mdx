@@ -1,15 +1,15 @@
 ---
 title: Privacy & security
-description: What happens to your code during a scan, what Sandchest keeps, and who can see it.
+description: What happens to your code during a scan, what RedNest keeps, and who can see it.
 ---
 
-> Sandchest never stores your source code. Every scan runs in a temporary environment that's deleted when the scan finishes. Model inference runs with zero data retention. We keep only your findings and the minimum code excerpts needed to explain them.
+> RedNest never stores your source code. Every scan runs in a temporary environment that's deleted when the scan finishes. Model inference runs with zero data retention. We keep only your findings and the minimum code excerpts needed to explain them.
 
 This page explains how that works. The [Privacy policy](/privacy) is the formal version.
 
 ## During a scan
 
-1. Sandchest clones with a short-lived GitHub token that can only read the contents of the one repository being scanned. Its other GitHub calls during the scan, such as reading a pull request's files and posting the Check, use the installation's own short-lived token.
+1. RedNest clones with a short-lived GitHub token that can only read the contents of the one repository being scanned. Its other GitHub calls during the scan, such as reading a pull request's files and posting the Check, use the installation's own short-lived token.
 2. It makes a shallow clone of that one commit into a temporary workspace: in the hosted service, an isolated virtual machine created for this scan alone.
 3. The scan reads the code there. Nothing in the repository is executed.
 4. When the scan ends, whether it succeeded or failed, the workspace is destroyed. There are no snapshots and no cache of your code.
@@ -20,9 +20,9 @@ Scans are orchestrated in steps that pass only IDs between them, so your code ne
 
 Code is sent to the model only for the duration of a scan. Our policy is to use model inference with zero data retention: the provider we use is set up not to keep prompts or outputs.
 
-Sandchest adds no account, repository, organization or user identifiers to prompts. Your code itself goes to the model, though, so anything written in it does too, such as names, email addresses or URLs in comments. Repository content is passed as clearly marked untrusted data, and the model is told to report text in it that tries to instruct it, rather than follow it.
+RedNest adds no account, repository, organization or user identifiers to prompts. Your code itself goes to the model, though, so anything written in it does too, such as names, email addresses or URLs in comments. Repository content is passed as clearly marked untrusted data, and the model is told to report text in it that tries to instruct it, rather than follow it.
 
-## What Sandchest keeps
+## What RedNest keeps
 
 | Kept | Why |
 | --- | --- |
@@ -37,7 +37,7 @@ Sandchest adds no account, repository, organization or user identifiers to promp
 
 Your email address is the primary one on your GitHub account, even if it is private on GitHub, because the App may read email addresses. A no-reply placeholder is used only when GitHub returns no address at all.
 
-Sandchest doesn't keep your source code, clones or diffs, and sign-in doesn't record IP addresses.
+RedNest doesn't keep your source code, clones or diffs, and sign-in doesn't record IP addresses.
 
 ## When code excerpts are deleted
 
@@ -51,14 +51,14 @@ The findings themselves stay, without code, so your history survives. Uninstalli
 
 ## Who can see findings
 
-- A person can see a repository's findings only if GitHub says they have push access or higher to it. Sandchest checks with GitHub using their own sign-in, and re-checks at least every five minutes.
+- A person can see a repository's findings only if GitHub says they have push access or higher to it. RedNest checks with GitHub using their own sign-in, and re-checks at least every five minutes.
 - On public repositories, nothing about a finding is posted to GitHub beyond a count by severity, because Checks and comments there are public. See [PR reviews](/docs/scans#public-repositories).
 - Billing and settings can only be changed by admins of the GitHub organization, or the owner of a personal account.
 - Agents act as the person who connected them, with the same access, re-checked with GitHub the same way. Connecting always needs that person's approval in their browser, signed in with GitHub: an MCP client's OAuth consent (with PKCE), or a device code they confirm. A first card payment is always made by the person on Stripe; agents never see card details. Revoke any agent in **Settings → Agents**. See [Use it from your agent](/docs/agents).
 
 ## GitHub App permissions
 
-Sandchest asks for the least GitHub lets it.
+RedNest asks for the least GitHub lets it.
 
 | Permission | Access | Why |
 | --- | --- | --- |
@@ -70,22 +70,22 @@ Sandchest asks for the least GitHub lets it.
 | Members | Read | Know who the organization's admins are, for billing and settings |
 | Email addresses | Read | Your sign-in email, for notifications |
 
-Sandchest never writes to your code and never opens issues.
+RedNest never writes to your code and never opens issues.
 
 ## Analytics, email and payments
 
-- **Analytics are first-party.** Usage events (page views with IDs removed from the address, time on page, clicks, sign-up steps and actions) go to Sandchest's own database. A random ID in a cookie ties them to a browser, and to an account after sign-in. They record opaque IDs, counts and categories, never code, finding contents, repository names, names, email addresses or IP addresses. The hosting provider's cookieless web analytics count page views and measure page speed. There are no advertising or tracking scripts.
-- **Finding emails** cover new critical findings and finished deep scans. They go to people who have signed in and had push access to the repository when Sandchest last checked, within the past 30 days. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
-- **Billing emails** go to the account's admins and can't be turned off: credits running low or out (only while auto top-up is off), an auto top-up that went through or failed, and a scan stopped because the model provider refused it. Admins are people GitHub confirmed as admins in the last 30 days; if there are none, Sandchest asks GitHub before sending. The scan-stopped email names the repository, so it follows the account's email setting and only goes to admins confirmed in the last 30 days.
+- **Analytics are first-party.** Usage events (page views with IDs removed from the address, time on page, clicks, sign-up steps and actions) go to RedNest's own database. A random ID in a cookie ties them to a browser, and to an account after sign-in. They record opaque IDs, counts and categories, never code, finding contents, repository names, names, email addresses or IP addresses. The hosting provider's cookieless web analytics count page views and measure page speed. There are no advertising or tracking scripts.
+- **Finding emails** cover new critical findings and finished deep scans. They go to people who have signed in and had push access to the repository when RedNest last checked, within the past 30 days. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
+- **Billing emails** go to the account's admins and can't be turned off: credits running low or out (only while auto top-up is off), an auto top-up that went through or failed, and a scan stopped because the model provider refused it. Admins are people GitHub confirmed as admins in the last 30 days; if there are none, RedNest asks GitHub before sending. The scan-stopped email names the repository, so it follows the account's email setting and only goes to admins confirmed in the last 30 days.
 - There is no marketing email.
-- **Payments** are processed by Stripe, through the billing service Autumn. Sandchest never sees your card number.
+- **Payments** are processed by Stripe, through the billing service Autumn. RedNest never sees your card number.
 
 The list of subprocessors that handle data for the hosted service is available on request from the contact address in the [Privacy policy](/privacy#contact).
 
 ## Self-hosted
 
-A self-hosted Sandchest sends nothing to us: no telemetry, no usage data. It talks only to GitHub, your own model endpoint, and the OSV vulnerability database (package names and versions only). See [Self-hosting](/docs/self-hosting#privacy).
+A self-hosted RedNest sends nothing to us: no telemetry, no usage data. It talks only to GitHub, your own model endpoint, and the OSV vulnerability database (package names and versions only). See [Self-hosting](/docs/self-hosting#privacy).
 
-## Reporting a vulnerability in Sandchest
+## Reporting a vulnerability in RedNest
 
-Please report security issues in Sandchest itself privately, to the security contact on the [Privacy](/privacy#contact) page, rather than in a public issue.
+Please report security issues in RedNest itself privately, to the security contact on the [Privacy](/privacy#contact) page, rather than in a public issue.

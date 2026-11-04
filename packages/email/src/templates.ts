@@ -1,10 +1,10 @@
 /**
  * Email templates as escaped HTML strings. Inline styles and tables only:
  * that is what email clients render reliably. Colours match the dashboard:
- * gold on near-black.
+ * red on near-black.
  */
 
-const C = { void: "#0d0a07", seam: "#2c2219", sand: "#f3e5c8", bright: "#fff3dc", dust: "#a69479", gold: "#fec242", critical: "#ff5a36", high: "#d76839", medium: "#fea121" };
+const C = { void: "#0a0a0b", seam: "#2a2a30", sand: "#f1f1f3", bright: "#ffffff", dust: "#8a8a94", gold: "#f50002", critical: "#f50002", high: "#c40002", medium: "#fea121" };
 const FONT = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
 
 type Severity = "critical" | "high" | "medium" | "low";
@@ -34,7 +34,7 @@ function layout(preview: string, body: string, footer = FOOTER): string {
 <div style="display:none;max-height:0;overflow:hidden">${e(preview)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.void}" style="background:${C.void}"><tr><td align="center" style="padding:40px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;font-family:${FONT};color:${C.sand};font-size:15px;line-height:1.6">
-<tr><td style="padding-bottom:32px;color:${C.gold};font-size:18px;font-weight:700">Sandchest</td></tr>
+<tr><td style="padding-bottom:32px;color:${C.gold};font-size:18px;font-weight:700">RedNest</td></tr>
 <tr><td style="padding-bottom:32px">${body}</td></tr>
 <tr><td style="padding-top:24px;border-top:1px solid ${C.seam};color:${C.dust};font-size:12px">${e(footer)}</td></tr>
 </table></td></tr></table></body></html>`;
@@ -66,7 +66,7 @@ function textList(findings: FindingSummary[]): string {
   return findings.map((f) => `${SEVERITY_LABEL[f.severity]}: ${f.title}\n${f.url}`).join("\n\n");
 }
 
-const FOOTER = "You get this because you can push to this repository. An admin can turn these emails off in Sandchest’s settings.";
+const FOOTER = "You get this because you can push to this repository. An admin can turn these emails off in RedNest’s settings.";
 
 /** New critical findings, from any scan. */
 export function criticalFindingEmail(input: { repo: string; findings: FindingSummary[] }): RenderedEmail {
@@ -74,8 +74,8 @@ export function criticalFindingEmail(input: { repo: string; findings: FindingSum
   const subject = count === 1 ? `Critical: ${input.findings[0]!.title}` : `${count} critical findings in ${input.repo}`;
   const lede =
     count === 1
-      ? `Sandchest found a critical vulnerability in ${input.repo}. Fix it before it ships.`
-      : `Sandchest found ${count} critical vulnerabilities in ${input.repo}. Fix them before they ship.`;
+      ? `RedNest found a critical vulnerability in ${input.repo}. Fix it before it ships.`
+      : `RedNest found ${count} critical vulnerabilities in ${input.repo}. Fix them before they ship.`;
   const html = layout(lede, `${heading(count === 1 ? "Found 1 critical." : `Found ${count} criticals.`)}${paragraph(lede)}${findingList(input.findings)}${button(input.findings[0]!.url, "See the attack path")}`);
   return { subject, html, text: `${lede}\n\n${textList(input.findings)}\n\n${FOOTER}` };
 }
@@ -104,8 +104,8 @@ const credits = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "credit
 
 function adminFooter(org: string, canTurnOff: boolean): string {
   return canTurnOff
-    ? `You get this because you’re an admin of ${org} on Sandchest. An admin can turn these emails off in Sandchest’s settings.`
-    : `You get this because you’re an admin of ${org} on Sandchest. Billing emails always go to admins: they’re how you hear before reviews stop.`;
+    ? `You get this because you’re an admin of ${org} on RedNest. An admin can turn these emails off in RedNest’s settings.`
+    : `You get this because you’re an admin of ${org} on RedNest. Billing emails always go to admins: they’re how you hear before reviews stop.`;
 }
 
 function render(input: {
@@ -146,7 +146,7 @@ export function creditsLowEmail(input: CreditsInput): RenderedEmail {
       subject: `${credits(input.credits)} left on ${input.org}`,
       title: "The free credits are running low.",
       paragraphs: [
-        `${input.org} is down to ${credits(input.credits)} of its free credits. When they run out, Sandchest stops: pull requests get a neutral Check instead of a review, and no scans run.`,
+        `${input.org} is down to ${credits(input.credits)} of its free credits. When they run out, RedNest stops: pull requests get a neutral Check instead of a review, and no scans run.`,
         `Join ${input.free.join} to keep going. Any free credits left over carry across.`,
       ],
       stat: { value: input.credits, label: `${input.credits === 1 ? "credit" : "credits"} left` },
@@ -174,7 +174,7 @@ export function creditsExhaustedEmail(input: Omit<CreditsInput, "credits">): Ren
       subject: `Free credits used up on ${input.org}`,
       title: "The free credits are spent.",
       paragraphs: [
-        `${input.org} has used all of its free credits, so Sandchest has stopped: pull requests get a neutral Check instead of a review, and no scans run.`,
+        `${input.org} has used all of its free credits, so RedNest has stopped: pull requests get a neutral Check instead of a review, and no scans run.`,
         `Join ${input.free.join} to keep going.`,
       ],
       button: { url: input.billingUrl, label: "Join" },

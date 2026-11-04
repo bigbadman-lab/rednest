@@ -51,7 +51,7 @@ const DURATION = IDLE + STEADY_AT + BURN + DISSOLVE;
 const FRAMES = Math.round(DURATION * FPS);
 
 const THEMES = {
-  dark: { wordmark: rgb("#fff3dc"), tagline: rgb("#c2b293"), cursor: rgb("#fec242") },
+  dark: { wordmark: rgb("#fff3dc"), tagline: rgb("#c2b293"), cursor: rgb("#f50002") },
   light: { wordmark: rgb("#15100b"), tagline: rgb("#6b5a44"), cursor: rgb("#ff9f19") },
 } as const;
 

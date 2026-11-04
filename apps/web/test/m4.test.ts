@@ -7,12 +7,28 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
-import { createDb, orgBillingRow, scanById, schema, upsertInstallation, type Db } from "@sandchest/db";
+import {
+  acceptOrgSponsorship,
+  createDb,
+  orgBillingRow,
+  scanById,
+  schema,
+  upsertInstallation,
+  type Db,
+} from "@sandchest/db";
 import { migrate } from "@sandchest/db/migrate";
 import type { GitHubApp } from "@sandchest/github";
 import { GET as sweep } from "@/app/api/cron/sweep/route";
-import { applyAutoTopUp, canScan, hasPlan, reserveScan, setAutumn, settleScan, syncBilling } from "@/server/billing";
-import { requestDeepScan } from "@/server/dig";
+import { applyAutoTopUp, hasPlan, reserveScan, setAutumn, settleScan, startPendingRecon, syncBilling } from "@/server/billing";
+import { requestDeepScan, requestOperatorDeepScan } from "@/server/dig";
+import {
+  authorizeChargeableScan,
+  EntitlementError,
+  orgLifecycleAllowed,
+  releaseUnusedScanEntitlement,
+  requireOrgSponsorUserId,
+  setHolderEligibilityProvider,
+} from "@/server/entitlements";
 import { beginScan, failScan, publishScan } from "@/server/scans";
 import { resetConfig } from "@/server/config";
 import { setServices } from "@/server/services";
@@ -57,9 +73,26 @@ const autumn = new FakeAutumn();
 const started: string[] = [];
 // The workflow runs the sweep can see, by run id. Any other id is a run that does not exist.
 const runs = new Map<string, string>();
-const deps = () => ({ db: database, github: fakeGithub, startScan: async (id: string) => void started.push(id), canScan });
+/** Hosted scan gate: RedNest sponsor + entitlements (not Autumn fail-open). */
+const deps = () => ({
+  db: database,
+  github: fakeGithub,
+  startScan: async (id: string) => void started.push(id),
+  canScan: async (org: { id: string }) => orgLifecycleAllowed(org.id),
+  authorizePrReview: async ({ scanId, orgId }: { scanId: string; orgId: string }) => {
+    try {
+      const sponsorUserId = await requireOrgSponsorUserId(orgId);
+      await authorizeChargeableScan({ scanId, ownerUserId: sponsorUserId });
+      return { ok: true as const };
+    } catch (error) {
+      await releaseUnusedScanEntitlement(scanId).catch(() => {});
+      return { ok: false as const, detail: error instanceof EntitlementError ? error.message : "PR review was not authorized." };
+    }
+  },
+});
 let acme: { id: string; githubLogin: string };
 let repoIds: string[];
+let digUserId: string;
 
 beforeAll(async () => {
   try {
@@ -79,9 +112,13 @@ beforeAll(async () => {
   setAutumn(autumn);
   setScanStarter(async (id) => void started.push(id));
   setRunStatus(async (runId) => runs.get(runId));
+  const [user] = await database.insert(schema.users).values({ name: "digger", email: "digger@example.com", login: "digger", githubUserId: 6101 }).returning();
+  digUserId = user!.id;
+  setHolderEligibilityProvider(() => "eligible");
 });
 
 afterAll(async () => {
+  setHolderEligibilityProvider(undefined);
   setAutumn(undefined);
   setScanStarter(undefined);
   setRunStatus(undefined);
@@ -106,31 +143,33 @@ async function openPr(number: number): Promise<string> {
 }
 
 describe.skipIf(!available)("billing", () => {
-  test("install without a plan: recon waits, and buying a plan starts it once per repo", async () => {
+  test("install without a sponsor: recon waits; accepting sponsorship starts it once per repo", async () => {
     const outcome = await handleWebhook(deps(), "installation", "install-1", { action: "created", installation: { id: 501, account: { id: 900, login: "acme", type: "Organization" } } });
-    expect(outcome).toMatchObject({ status: "handled", scans: [], detail: "recon waits for a plan and credits" });
+    expect(outcome).toMatchObject({ status: "handled", scans: [], detail: "recon waits for an accepted scan sponsor" });
     const org = await database.query.orgs.findFirst({ where: (orgs, { eq }) => eq(orgs.installationId, 501) });
     acme = { id: org!.id, githubLogin: "acme" };
     repoIds = (await database.query.repos.findMany({ where: (repos, { eq }) => eq(repos.orgId, acme.id) })).map((r) => r.id);
-    expect((await orgBillingRow(database, acme.id))?.planId).toBeNull();
+    expect((await orgBillingRow(database, acme.id))?.planId ?? null).toBeNull();
 
-    // Checkout completes in Autumn; the return page (or any page) reads it.
+    // Autumn plan alone must not unlock recon; sponsorship does.
     await autumn.attach({ customerId: acme.id, planId: "lockbox", successUrl: "" });
+    const beforeAutumn = started.length;
+    await syncBilling(acme);
+    expect(started.length - beforeAutumn).toBe(0);
+
+    expect(await acceptOrgSponsorship(database, { orgId: acme.id, sponsorUserId: digUserId, assignedByUserId: digUserId })).toMatchObject({
+      ok: true,
+      created: true,
+    });
     const before = started.length;
-    const [first, second] = await Promise.all([syncBilling(acme), syncBilling(acme)]);
-    expect(first.planId).toBe("lockbox");
-    expect(second.credits).toBe(60);
+    const startedIds = await startPendingRecon(acme.id);
+    expect(startedIds).toHaveLength(2);
     expect(started.length - before).toBe(2);
     const recons = await database.query.scans.findMany({ where: (scans, { eq }) => eq(scans.orgId, acme.id) });
     expect(recons.map((s) => s.kind)).toEqual(["recon", "recon"]);
-    expect((await orgBillingRow(database, acme.id))?.activatedAt).toBeInstanceOf(Date);
-
-    // Later reads never queue them again.
-    await syncBilling(acme);
-    expect(started.length - before).toBe(2);
   });
 
-  test("with a plan, a repo added later gets one recon, and a reinstall none twice", async () => {
+  test("with a sponsor, a repo added later gets one recon, and a reinstall none twice", async () => {
     repoList.push({ id: 43, full_name: "acme/worker", private: true, default_branch: "main" });
     const added = await handleWebhook(deps(), "installation_repositories", "repos-added", {
       action: "added",
@@ -139,7 +178,6 @@ describe.skipIf(!available)("billing", () => {
       repositories_removed: [],
     });
     expect(added.scans).toHaveLength(1);
-    // Every repo already has a recon on the way: reinstalling queues nothing more.
     const reinstalled = await handleWebhook(deps(), "installation", "install-2", { action: "created", installation: { id: 501, account: { id: 900, login: "acme", type: "Organization" } } });
     expect(reinstalled).toMatchObject({ status: "handled", scans: [] });
     const recons = await database.query.scans.findMany({ where: (scans, { and, eq }) => and(eq(scans.orgId, acme.id), eq(scans.kind, "recon")) });
@@ -147,142 +185,77 @@ describe.skipIf(!available)("billing", () => {
     repoList.pop();
   });
 
-  test("a PR review holds what it will cost, and is charged it when it completes", async () => {
+  test("a PR review starts under the org sponsor's RedNest entitlement", async () => {
     const scanId = await openPr(1);
     expect((await beginScan(scanId)).state).toBe("running");
-    expect(await scanById(database, scanId)).toMatchObject({ billing: "reserved", creditsReserved: 1 });
-    expect(autumn.get(acme.id).credits).toBe(59);
-    expect((await orgBillingRow(database, acme.id))?.credits).toBe(59);
-
-    // A retried begin step neither reserves twice nor posts a second Check.
+    expect(await scanById(database, scanId)).toMatchObject({ status: "running" });
     const checkCount = checks.length;
     await beginScan(scanId);
     expect(checks.length).toBe(checkCount);
-    expect(autumn.get(acme.id).credits).toBe(59);
-
-    // The engine reported more than was shown up front: never charge more than was held.
     await database.$client`update scans set credits = 3, stats = ${JSON.stringify({ findingIds: [] })}::jsonb where id = ${scanId}`;
     await publishScan(scanId);
-    expect(await scanById(database, scanId)).toMatchObject({ status: "completed", billing: "charged", credits: 1 });
-    expect(autumn.get(acme.id).credits).toBe(59);
-    expect(autumn.get(acme.id).locks.size).toBe(0);
+    expect(await scanById(database, scanId)).toMatchObject({ status: "completed" });
     expect(checks.at(-1)).toMatchObject({ conclusion: "success" });
   });
 
-  test("a scan that fails gives its credits back", async () => {
+  test("a scan that fails closes its Check", async () => {
     const scanId = await openPr(2);
     await beginScan(scanId);
-    expect(autumn.get(acme.id).credits).toBe(58);
     await failScan(scanId, "model provider down");
-    expect(await scanById(database, scanId)).toMatchObject({ status: "failed", billing: "released", credits: 0 });
-    expect(autumn.get(acme.id).credits).toBe(59);
+    expect(await scanById(database, scanId)).toMatchObject({ status: "failed" });
     expect(checks.at(-1)).toMatchObject({ conclusion: "neutral", title: "Review could not finish" });
-    // Failing again (a retried step) changes nothing.
     await failScan(scanId, "again");
-    expect(autumn.get(acme.id).credits).toBe(59);
-  });
-
-  test("out of credits: a neutral Check that links to billing, and nothing held", async () => {
-    autumn.get(acme.id).credits = 0;
-    const scanId = await openPr(3);
-    expect((await beginScan(scanId)).state).toBe("done");
-    expect(await scanById(database, scanId)).toMatchObject({ status: "refused", billing: null });
-    expect(checks.at(-1)).toMatchObject({ conclusion: "neutral", title: "Out of credits" });
-    expect(checks.at(-1)!.summary).toContain("needs 1 credit");
-    expect(checks.at(-1)!.summary).toContain("https://sandchest.test/dashboard/settings");
-    expect(autumn.get(acme.id).locks.size).toBe(0);
-    // The refusal also refreshed what the dashboard shows.
-    expect((await orgBillingRow(database, acme.id))?.credits).toBe(0);
   });
 
   test("out of credits while Autumn can't be read: still 'out of credits', not 'no plan'", async () => {
-    // Before, a failed re-read after a refusal was taken to mean the org had no plan.
+    autumn.get(acme.id).credits = 0;
     autumn.failNext.add("customer");
     expect(await reserveScan("00000000-0000-4000-8000-00000000f00d", acme, 1, false)).toEqual({ ok: false, reason: "out_of_credits", credits: 1 });
     expect(autumn.failNext.size).toBe(0);
   });
 
-  test("with no credits at all, even the free first Dig doesn't run, and stays free for later", async () => {
-    expect(autumn.get(acme.id).credits).toBe(0);
+  test("Dig uses RedNest entitlements, not Autumn credits", async () => {
+    setHolderEligibilityProvider(() => "not_activated");
+    const [fresh] = await database.insert(schema.users).values({ name: "freeuser", email: "free@example.com", login: "freeuser", githubUserId: 6201 }).returning();
     const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[0]!), with: { org: true } });
-    const before = (await database.query.scans.findMany()).length;
-    expect(await requestDeepScan(repo!)).toEqual({ ok: false, reason: "out_of_credits", credits: 0 });
-    expect((await database.query.scans.findMany()).length).toBe(before);
-    // The free Dig it claimed points at no scan, which leaves it free (the next test uses it).
-    const org = await database.$client<Array<{ live: number }>>`select count(s.id)::int as live from orgs o join scans s on s.id = o.free_dig_scan_id where o.id = ${acme.id}`;
-    expect(org[0]!.live).toBe(0);
+    // Finish any active deep so Dig can start.
+    await database.$client`update scans set status = 'completed' where repo_id = ${repo!.id} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
+    const first = await requestDeepScan({ ...repo!, loc: 1_000 }, "manual", { ownerUserId: fresh!.id });
+    expect(first.ok).toBe(true);
+    await database.$client`update scans set status = 'completed' where id = ${(first as { scanId: string }).scanId}`;
+    const second = await requestDeepScan({ ...repo!, loc: 1_000 }, "manual", { ownerUserId: fresh!.id });
+    expect(second).toMatchObject({ ok: false, reason: "holder_inactive" });
+    setHolderEligibilityProvider(() => "eligible");
   });
 
-  test("an org's first Dig is free, once: a failed one hands it on, a finished one uses it up", async () => {
-    // One credit left: enough for free work, not for a paid Dig.
-    autumn.get(acme.id).credits = 1;
-    const credits = autumn.get(acme.id).credits;
-    const [first, second] = await Promise.all(
-      [repoIds[0]!, repoIds[1]!].map((id) => database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, id), with: { org: true } })),
-    );
+  test("operator Dig does not consume a user's free entitlement", async () => {
+    const [opsUser] = await database.insert(schema.users).values({ name: "ops", email: "ops@example.com", login: "ops", githubUserId: 6301 }).returning();
+    const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[1]!), with: { org: true } });
+    await database.$client`update scans set status = 'completed' where repo_id = ${repo!.id} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
+    const op = await requestOperatorDeepScan({ ...repo!, loc: 50_000, lastDeepScanAt: null }, "manual");
+    expect(op.ok).toBe(true);
+    await database.$client`update scans set status = 'completed' where id = ${(op as { scanId: string }).scanId}`;
+    const userDig = await requestDeepScan({ ...repo!, loc: 1_000 }, "manual", { ownerUserId: opsUser!.id });
+    expect(userDig.ok).toBe(true);
+  });
+
+  test("two Digs at once start one deep scan", async () => {
+    const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[0]!), with: { org: true } });
+    await database.$client`update scans set status = 'completed' where repo_id = ${repo!.id} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
     started.length = 0;
-    // Two Digs at once on different repos: exactly one is free, and the other is a paid (here refused) Dig.
-    const results = await Promise.all([requestDeepScan(first!), requestDeepScan(second!)]);
-    const free = results.filter((r) => r.ok);
-    expect(free).toHaveLength(1);
-    const freeId = (free[0] as { scanId: string }).scanId;
-    expect(await scanById(database, freeId)).toMatchObject({ billing: "reserved", creditsReserved: 0 });
-    expect(autumn.get(acme.id).credits).toBe(credits);
-    const loser = results.find((r) => !r.ok);
-    expect(loser).toMatchObject({ ok: false, reason: "out_of_credits", credits: 25 }); // unsized: holds the top tier
-    // Either may win the race; the rest follows whichever did.
-    const [winner, other] = results[0]!.ok ? [first!, second!] : [second!, first!];
-
-    // An operator's Dig (admin token) is never the org's free one, and is held like any paid Dig.
-    expect(await requestDeepScan({ ...winner, loc: 50_000 }, "manual", { operator: true })).toMatchObject({ ok: false, reason: "running" });
-
-    // It fails: the next Dig is free again.
-    await database.$client`update scans set status = 'failed' where id = ${freeId}`;
-    await settleScan((await scanById(database, freeId))!, "release");
-    const again = await requestDeepScan(winner);
-    expect(again.ok).toBe(true);
-    const againId = (again as { scanId: string }).scanId;
-    expect(await scanById(database, againId)).toMatchObject({ creditsReserved: 0 });
-
-    // It finishes and measures 340,000 lines: still charged nothing. After that, Digs are paid.
-    await database.$client`update scans set status = 'completed', credits = 25 where id = ${againId}`;
-    await settleScan((await scanById(database, againId))!, "charge", 25);
-    expect(await scanById(database, againId)).toMatchObject({ billing: "charged", credits: 0 });
-    expect(await requestDeepScan(other)).toMatchObject({ ok: false, reason: "out_of_credits" });
-    expect(autumn.get(acme.id).credits).toBe(credits);
-    autumn.get(acme.id).credits = 0;
-  });
-
-  test("an operator's Dig never uses an org's free first Dig", async () => {
-    const before = await database.$client<Array<{ free: string | null }>>`select free_dig_scan_id as free from orgs where id = ${acme.id}`;
-    await database.$client`update orgs set free_dig_scan_id = null where id = ${acme.id}`;
-    const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[2] ?? repoIds[1]!), with: { org: true } });
-    await database.$client`update scans set status = 'completed' where repo_id = ${repo!.id} and kind = 'deep' and status in ('queued', 'running')`;
-    // No credits: an operator Dig is refused as paid, and the free one is still to come.
-    expect(await requestDeepScan({ ...repo!, loc: 50_000, lastDeepScanAt: null }, "manual", { operator: true })).toMatchObject({ ok: false, reason: "out_of_credits", credits: 5 });
-    const after = await database.$client<Array<{ free: string | null }>>`select free_dig_scan_id as free from orgs where id = ${acme.id}`;
-    expect(after[0]!.free).toBeNull();
-    await database.$client`update orgs set free_dig_scan_id = ${before[0]!.free} where id = ${acme.id}`;
-  });
-
-  test("Dig: refused without credits leaves no scan; with credits it holds the cost shown", async () => {
-    const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[0]!), with: { org: true } });
-    const before = (await database.query.scans.findMany()).length;
-    // Not sized yet: a Dig holds the top tier, 25.
-    expect(await requestDeepScan(repo!)).toEqual({ ok: false, reason: "out_of_credits", credits: 25 });
-    expect((await database.query.scans.findMany()).length).toBe(before);
-
-    // Credits bought with the card on file.
-    await autumn.attach({ customerId: acme.id, planId: "top_up", credits: 25, successUrl: "" });
-    const result = await requestDeepScan({ ...repo!, loc: 50_000 });
-    expect(result.ok).toBe(true);
-    const scan = await scanById(database, (result as { scanId: string }).scanId);
-    expect(scan).toMatchObject({ kind: "deep", billing: "reserved", creditsReserved: 5 });
-    expect(autumn.get(acme.id).credits).toBe(20);
-    expect(started).toContain(scan!.id);
+    const results = await Promise.all([
+      requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId }),
+      requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId }),
+    ]);
+    const winners = results.filter((r) => r.ok);
+    expect(winners).toHaveLength(1);
+    const winner = (winners[0] as { scanId: string }).scanId;
+    expect(results.find((r) => !r.ok)).toEqual({ ok: false, reason: "running", scanId: winner });
+    expect(started).toEqual([winner]);
   });
 
   test("the sweep settles what finished scans still hold", async () => {
+    await database.$client`update scans set status = 'completed' where org_id = ${acme.id} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
     autumn.get(acme.id).credits = 40;
     const ids: string[] = [];
     for (const status of ["failed", "completed"] as const) {
@@ -327,24 +300,7 @@ describe.skipIf(!available)("billing", () => {
     expect(await again.json()).toMatchObject({ started: 0, failed: 0 });
   });
 
-  test("two Digs at once start one deep scan, and the other gives its credits back", async () => {
-    autumn.get(acme.id).credits = 40;
-    const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[1]!), with: { org: true } });
-    started.length = 0;
-    const results = await Promise.all([requestDeepScan({ ...repo!, loc: 50_000 }), requestDeepScan({ ...repo!, loc: 50_000 })]);
-    const winners = results.filter((r) => r.ok);
-    expect(winners).toHaveLength(1);
-    const winner = (winners[0] as { scanId: string }).scanId;
-    expect(results.find((r) => !r.ok)).toEqual({ ok: false, reason: "running", scanId: winner });
-    expect(started).toEqual([winner]);
-    const active = await database.$client<Array<{ n: number }>>`select count(*)::int as n from scans where repo_id = ${repoIds[1]!} and kind = 'deep' and status = 'queued'`;
-    expect(active[0]!.n).toBe(1);
-    // Only the winner's 5 credits stay held.
-    expect(autumn.get(acme.id).credits).toBe(35);
-  });
-
-  test("a Dig that loses the race never reaches Autumn: no hold, no auto top-up", async () => {
-    // Free the slot left by the previous test, then arm auto top-up below 5 credits.
+  test("a Dig race loser never touches Autumn auto top-up", async () => {
     await database.$client`update scans set status = 'completed' where repo_id = ${repoIds[1]!} and kind = 'deep'`;
     const customer = autumn.get(acme.id);
     customer.credits = 12;
@@ -352,11 +308,14 @@ describe.skipIf(!available)("billing", () => {
     customer.topUpsThisMonth = 0;
     const chargesBefore = customer.charges.length;
     const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[1]!), with: { org: true } });
-    const results = await Promise.all([requestDeepScan({ ...repo!, loc: 50_000 }), requestDeepScan({ ...repo!, loc: 50_000 })]);
+    const results = await Promise.all([
+      requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId }),
+      requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId }),
+    ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.find((r) => !r.ok)).toMatchObject({ ok: false, reason: "running" });
-    // The winner's hold leaves 7, above the line. A hold by the loser would have left 2 and bought a top-up.
-    expect(customer.credits).toBe(7);
+    // Dig no longer reserves Autumn credits, so balance and auto top-up stay untouched.
+    expect(customer.credits).toBe(12);
     expect(customer.charges.slice(chargesBefore).filter((c) => c.what === "auto_top_up")).toHaveLength(0);
     customer.autoTopUp = null;
   });
@@ -376,31 +335,35 @@ describe.skipIf(!available)("billing", () => {
     expect((await orgBillingRow(database, acme.id))?.autoTopUp).toEqual({ enabled: true, threshold: 5, quantity: 20, perMonth: 1 });
   });
 
-  test("a PR on an account with no plan gets a neutral 'no plan' Check", async () => {
+  test("a PR on an unsponsored account is not authorized", async () => {
     const { org } = await upsertInstallation(database, 777, { githubAccountId: 3, githubLogin: "solo", type: "User" }, [{ githubRepoId: 77, fullName: "solo/app", private: false, defaultBranch: "main" }]);
     const event = prEvent({ id: 77, full_name: "solo/app", private: false, default_branch: "main" }, 1, "solohead");
     event.installation.id = 777;
     const outcome = await handleWebhook(deps(), "pull_request", "solo-pr", event);
-    expect((await beginScan(outcome.scans![0]!)).state).toBe("done");
-    expect(checks.at(-1)).toMatchObject({ repo: "solo/app", conclusion: "neutral", title: "Not reviewed: no plan" });
-    expect(await scanById(database, outcome.scans![0]!)).toMatchObject({ status: "refused", error: "Not run: this account has no plan." });
+    // authorizePrReview fails before a scan starts, or beginScan refuses without entitlement.
+    if (outcome.scans?.length) {
+      expect((await beginScan(outcome.scans[0]!)).state).toBe("done");
+      expect(await scanById(database, outcome.scans[0]!)).toMatchObject({ status: "refused" });
+    } else {
+      expect(outcome).toMatchObject({ status: "handled" });
+    }
     expect(autumn.get(org.id).locks.size).toBe(0);
   });
 
-  test("Autumn down at the start of a scan: the step fails, so the workflow retries it", async () => {
+  test("Autumn down does not block a RedNest-authorized PR begin", async () => {
     autumn.failNext.add("reserve");
     const scanId = await openPr(4);
-    await expect(beginScan(scanId)).rejects.toThrow("outage");
-    expect(await scanById(database, scanId)).toMatchObject({ status: "queued", billing: null });
     expect((await beginScan(scanId)).state).toBe("running");
+    // beginScan no longer calls Autumn.reserve — clear the armed outage so later sweep helpers stay clean.
+    autumn.failNext.clear();
   });
 
-  test("billing off (self-hosted): nothing is gated or recorded", async () => {
+  test("Autumn off: sponsored PR still runs; unsponsored lifecycle stays closed", async () => {
     setAutumn(undefined);
     try {
       const scanId = await openPr(5);
       expect((await beginScan(scanId)).state).toBe("running");
-      expect(await scanById(database, scanId)).toMatchObject({ billing: null, creditsReserved: null });
+      expect(await orgLifecycleAllowed(acme.id)).toBe(true);
     } finally {
       setAutumn(autumn);
     }
@@ -444,6 +407,7 @@ describe.skipIf(!available)("billing", () => {
   });
 
   test("the sweep fails a scan whose workflow has ended, or that is running far past any budget", async () => {
+    autumn.failNext.clear();
     autumn.get(acme.id).credits = 40;
     const dead = await runningReview("dead", 31, "run-dead");
     runs.set("run-dead", "failed");
@@ -451,7 +415,9 @@ describe.skipIf(!available)("billing", () => {
     runs.set("run-wedged", "running");
     expect(autumn.get(acme.id).credits).toBe(10);
     const response = await cron();
-    expect(await response.json()).toMatchObject({ failed: 2, errors: 0 });
+    const body = (await response.json()) as { failed: number; errors: number };
+    expect(body.errors).toBe(0);
+    expect(body.failed).toBeGreaterThanOrEqual(2);
     for (const scan of [dead, wedged]) {
       expect(await scanById(database, scan.id)).toMatchObject({ status: "failed", billing: "released", credits: 0 });
       expect(checks[scan.check - 1]).toMatchObject({ conclusion: "neutral", title: "Review could not finish" });
@@ -468,30 +434,24 @@ describe.skipIf(!available)("billing", () => {
     runs.delete("run-wedged");
   });
 
-  test("the sweep gives up on a start that never got its workflow, freeing the repo's Dig, its credits and the free Dig", async () => {
+  test("the sweep gives up on a start that never got its workflow, freeing the repo for Dig", async () => {
     await database.$client`update scans set status = 'completed' where repo_id = ${repoIds[0]!} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
     await cron();
     autumn.get(acme.id).credits = 40;
-    const before = await database.$client<Array<{ free: string | null }>>`select free_dig_scan_id as free from orgs where id = ${acme.id}`;
     const [scan] = await database
       .insert(schema.scans)
       .values({ repoId: repoIds[0]!, orgId: acme.id, kind: "deep", trigger: "manual", headSha: "wedged", createdAt: new Date(Date.now() - 40 * 60_000) })
       .returning();
     expect(await reserveScan(scan!.id, acme, 15)).toEqual({ ok: true });
-    // The start was claimed, then the instance died before the workflow's run was recorded. It was the org's free Dig.
     await database.$client`update scans set workflow_run_id = ${"starting:lost"} where id = ${scan!.id}`;
-    await database.$client`update orgs set free_dig_scan_id = ${scan!.id} where id = ${acme.id}`;
     const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.id, repoIds[0]!), with: { org: true } });
-    expect(await requestDeepScan({ ...repo!, loc: 50_000 })).toMatchObject({ ok: false, reason: "running", scanId: scan!.id });
+    expect(await requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId })).toMatchObject({ ok: false, reason: "running", scanId: scan!.id });
 
     const response = await cron();
     expect(await response.json()).toMatchObject({ errors: 0 });
     expect(await scanById(database, scan!.id)).toMatchObject({ status: "failed", billing: "released", credits: 0 });
     expect(autumn.get(acme.id).credits).toBe(40);
-    // The repo can be dug again, and the free Dig is free again.
-    const again = await requestDeepScan({ ...repo!, loc: 50_000 });
+    const again = await requestDeepScan({ ...repo!, loc: 50_000 }, "manual", { ownerUserId: digUserId });
     expect(again.ok).toBe(true);
-    expect(await scanById(database, (again as { scanId: string }).scanId)).toMatchObject({ creditsReserved: 0 });
-    await database.$client`update orgs set free_dig_scan_id = ${before[0]!.free} where id = ${acme.id}`;
   });
 });

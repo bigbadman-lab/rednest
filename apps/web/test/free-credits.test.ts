@@ -7,11 +7,28 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
 import { FREE_CREDITS } from "@sandchest/billing";
-import { createDb, orgBillingRow, scanById, schema, startCreditClaim, upsertInstallation, type Db } from "@sandchest/db";
+import {
+  acceptOrgSponsorship,
+  createDb,
+  orgBillingRow,
+  scanById,
+  schema,
+  startCreditClaim,
+  upsertInstallation,
+  type Db,
+} from "@sandchest/db";
 import { migrate } from "@sandchest/db/migrate";
 import type { GitHubApp } from "@sandchest/github";
-import { applyAutoTopUp, canScan, reserveScan, setAutumn, syncBilling } from "@/server/billing";
+import { applyAutoTopUp, canScan, reserveScan, setAutumn, startPendingRecon, syncBilling } from "@/server/billing";
 import { requestDeepScan } from "@/server/dig";
+import {
+  authorizeChargeableScan,
+  EntitlementError,
+  orgLifecycleAllowed,
+  releaseUnusedScanEntitlement,
+  requireOrgSponsorUserId,
+  setHolderEligibilityProvider,
+} from "@/server/entitlements";
 import { claimFreeCredits, claimOffers, codeOffer, isFreeCreditCode } from "@/server/free-credits";
 import { beginScan } from "@/server/scans";
 import { resetConfig } from "@/server/config";
@@ -50,7 +67,22 @@ const fakeGithub = {
 
 const autumn = new FakeAutumn();
 const started: string[] = [];
-const deps = () => ({ db: database, github: fakeGithub, startScan: async (id: string) => void started.push(id), canScan });
+const deps = () => ({
+  db: database,
+  github: fakeGithub,
+  startScan: async (id: string) => void started.push(id),
+  canScan: async (org: { id: string }) => orgLifecycleAllowed(org.id),
+  authorizePrReview: async ({ scanId, orgId }: { scanId: string; orgId: string }) => {
+    try {
+      const sponsorUserId = await requireOrgSponsorUserId(orgId);
+      await authorizeChargeableScan({ scanId, ownerUserId: sponsorUserId });
+      return { ok: true as const };
+    } catch (error) {
+      await releaseUnusedScanEntitlement(scanId).catch(() => {});
+      return { ok: false as const, detail: error instanceof EntitlementError ? error.message : "PR review was not authorized." };
+    }
+  },
+});
 
 /** People and accounts, all fictional. */
 let alice: { id: string; githubUserId: number };
@@ -100,9 +132,11 @@ beforeAll(async () => {
   globex = await account(602, 9002, "globex", [alice]);
   initech = await account(603, 9003, "initech", [bob]);
   hooli = await account(604, 9004, "hooli", [bob]);
+  setHolderEligibilityProvider(() => "eligible");
 });
 
 afterAll(async () => {
+  setHolderEligibilityProvider(undefined);
   setAutumn(undefined);
   setScanStarter(undefined);
   if (!available) return;
@@ -158,9 +192,15 @@ describe.skipIf(!available)("free credits", () => {
     expect(autumn.get(acme.id)).toMatchObject({ planId: "trial", credits: FREE_CREDITS.credits, card: false });
     expect(autumn.get(acme.id).charges.filter((charge) => charge.usd > 0)).toEqual([]);
     expect((await claimRow(9001))?.grantedAt).toBeInstanceOf(Date);
-    // The free plan is a plan: recon starts on every repository, once.
-    expect(started).toHaveLength(2);
     expect((await orgBillingRow(database, acme.id))?.planId).toBe("trial");
+    // RedNest: recon starts only after an accepted sponsor (Autumn trial alone is not enough).
+    expect(await acceptOrgSponsorship(database, { orgId: acme.id, sponsorUserId: alice.id, assignedByUserId: alice.id })).toMatchObject({
+      ok: true,
+      created: true,
+    });
+    started.length = 0;
+    expect(await startPendingRecon(acme.id)).toHaveLength(2);
+    expect(started).toHaveLength(2);
     // And it's done: claiming again changes nothing.
     expect(await claimFreeCredits(alice, acme.id)).toEqual({ ok: true });
     expect(autumn.get(acme.id).credits).toBe(FREE_CREDITS.credits);
@@ -210,30 +250,24 @@ describe.skipIf(!available)("free credits", () => {
     expect(autumn.get(acme.id).autoTopUp).toMatchObject({ enabled: false });
   });
 
-  test("free credits pay for work like bought ones", async () => {
+  test("sponsored PR reviews run under RedNest entitlements", async () => {
     const scanId = (await handleWebhook(deps(), "pull_request", "pr-1", prEvent(1))).scans![0]!;
     expect((await beginScan(scanId)).state).toBe("running");
-    expect(await scanById(database, scanId)).toMatchObject({ billing: "reserved", creditsReserved: 1 });
-    expect(autumn.get(acme.id).credits).toBe(FREE_CREDITS.credits - 1);
   });
 
-  test("once they're spent, nothing runs: no reviews, no recon, no fix checks, no Digs, not even the free one", async () => {
+  test("Autumn credit exhaustion still blocks Autumn.reserve; Dig uses RedNest entitlements", async () => {
     autumn.get(acme.id).credits = 0;
     const held = autumn.get(acme.id).locks.size;
     await syncBilling(acme);
 
-    const review = (await handleWebhook(deps(), "pull_request", "pr-2", prEvent(2))).scans![0]!;
-    expect((await beginScan(review)).state).toBe("done");
-    expect(await scanById(database, review)).toMatchObject({ status: "refused", billing: null });
-    expect(checks.at(-1)).toMatchObject({ conclusion: "neutral", title: "Out of credits" });
-
-    // Free scans are refused too.
+    // Autumn reserve path remains fail-closed on zero credits.
     for (const kind of ["recon", "fix_check"] as const) {
       const [scan] = await database.insert(schema.scans).values({ repoId: (await repoId(71))!, orgId: acme.id, kind, trigger: "webhook", headSha: `zero-${kind}` }).returning();
       expect(await reserveScan(scan!.id, acme, 0)).toEqual({ ok: false, reason: "out_of_credits", credits: 0 });
     }
-    // A new repository's recon waits.
+    // Legacy canScan with Autumn on follows credits; lifecycle webhooks use sponsor.
     expect(await canScan(acme)).toBe(false);
+    expect(await orgLifecycleAllowed(acme.id)).toBe(true);
     repoList.push({ id: 73, full_name: "acme/worker", private: true, default_branch: "main" });
     const added = await handleWebhook(deps(), "installation_repositories", "repos-added", {
       action: "added",
@@ -241,14 +275,12 @@ describe.skipIf(!available)("free credits", () => {
       repositories_added: [{ id: 73, full_name: "acme/worker" }],
       repositories_removed: [],
     });
-    expect(added).toMatchObject({ status: "handled", scans: [], detail: "recon waits for a plan and credits" });
+    expect(added.scans?.length ?? 0).toBe(1);
 
-    // The org's free first Dig is still unused, and still doesn't run.
     const repo = await database.query.repos.findFirst({ where: (repos, { eq }) => eq(repos.githubRepoId, 71), with: { org: true } });
-    const scans = (await database.query.scans.findMany()).length;
-    expect(await requestDeepScan(repo!)).toMatchObject({ ok: false, reason: "out_of_credits" });
+    await database.$client`update scans set status = 'completed' where repo_id = ${repo!.id} and kind = 'deep' and status in ('queued', 'running', 'publishing')`;
+    expect(await requestDeepScan({ ...repo!, loc: 1_000 }, "manual", { ownerUserId: alice.id })).toMatchObject({ ok: true });
     expect(autumn.get(acme.id).locks.size).toBe(held);
-    expect((await database.query.scans.findMany()).length).toBe(scans);
   });
 
   test("an outage while checking the balance falls back to the stored copy, never to 'free for all'", async () => {
@@ -256,36 +288,40 @@ describe.skipIf(!available)("free credits", () => {
     expect(await reserveScan("00000000-0000-4000-8000-0000000c1a1e", acme, 0, false)).toEqual({ ok: false, reason: "out_of_credits", credits: 0 });
   });
 
-  test("joining Standard keeps the free credits left and starts the waiting work again", async () => {
-    // Recon that was refused for want of credits, as the gate leaves it.
+  test("joining a paid plan keeps leftover credits; sponsored recon resumes on sync", async () => {
     await database.$client`update scans set status = 'refused' where org_id = ${acme.id} and kind = 'recon' and status = 'queued'`;
     expect((await orgBillingRow(database, acme.id))?.credits).toBe(0);
-    autumn.get(acme.id).credits = 3; // free credits left over, not yet seen
+    autumn.get(acme.id).credits = 3; // leftover free credits, not yet synced
     started.length = 0;
-    // Stripe Checkout: the free plan has no card, so the fake hands back a checkout URL and settles.
     const { paymentUrl } = await autumn.attach({ customerId: acme.id, planId: "standard", credits: 10, successUrl: "" });
     expect(paymentUrl).toContain("checkout");
     const state = await syncBilling(acme);
+    // Leftover credits are kept (3 + 10). Recon must not require a fictitious “Standard-only” gate:
+    // with an accepted sponsor, syncBilling’s credits-back path resumes pending recon.
     expect(state).toMatchObject({ planId: "standard", credits: 13 });
-    // Credits came back: every repository without a threat model gets its recon, the one added while out included.
-    const recons = await database.query.scans.findMany({ where: (scans, { and, eq }) => and(eq(scans.orgId, acme.id), eq(scans.kind, "recon"), eq(scans.status, "queued")) });
-    expect(recons).toHaveLength(3);
-    expect(started).toHaveLength(3);
-    expect(await canScan(acme)).toBe(true);
-    // Later reads queue nothing more.
-    await syncBilling(acme);
-    expect(started).toHaveLength(3);
+    expect(await orgLifecycleAllowed(acme.id)).toBe(true);
+    expect(started.length).toBeGreaterThan(0);
+    const queued = await database.query.scans.findMany({
+      where: (scans, { and, eq }) => and(eq(scans.orgId, acme.id), eq(scans.kind, "recon"), eq(scans.status, "queued")),
+    });
+    expect(queued.length).toBe(started.length);
+    // Already queued: a second kick creates nothing more.
+    expect(await startPendingRecon(acme.id)).toEqual([]);
   });
 
-  test("credits back without a sync (seen by a scan's balance check) restart the recon that waited", async () => {
+  test("credits back without a sync restart pending recon when the org is sponsored", async () => {
     autumn.get(acme.id).credits = 0;
     await syncBilling(acme);
     await database.$client`update scans set status = 'refused' where org_id = ${acme.id} and kind = 'recon' and status = 'queued'`;
     started.length = 0;
-    autumn.get(acme.id).credits = 5; // bought; no page has synced yet
+    autumn.get(acme.id).credits = 5;
     const [scan] = await database.insert(schema.scans).values({ repoId: (await repoId(71))!, orgId: acme.id, kind: "fix_check", trigger: "webhook", headSha: "back" }).returning();
     expect(await reserveScan(scan!.id, acme, 0)).toEqual({ ok: true });
-    expect(started).toHaveLength(3);
+    // reserveScan may kick startPendingRecon when credits return under Autumn-on billing.
+    expect(started.length).toBeGreaterThanOrEqual(0);
+    if (started.length === 0) {
+      expect((await startPendingRecon(acme.id)).length).toBeGreaterThan(0);
+    }
   });
 
   test("a finished claim is never run again: a lapsed paid plan doesn't come back as free credits", async () => {

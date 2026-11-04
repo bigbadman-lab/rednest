@@ -6,13 +6,13 @@ import { SetupShell } from "@/components/app/setup-shell";
 import { appUrl, newState, SETUP_COOKIE, sessionValid, setupNeeded, setupOrigin, setupToken } from "@/server/setup";
 import "../app.css";
 
-export const metadata: Metadata = { title: "Set up · Sandchest", referrer: "no-referrer", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Set up · RedNest", referrer: "no-referrer", robots: { index: false, follow: false } };
 
 const ASKS = [
   ["Read code", "Clones each repository into a temporary workspace for a scan."],
   ["Write pull request reviews", "Comments on the lines that let an attacker in."],
-  ["Write checks", "The Sandchest check on every pull request."],
-  ["Read issues", "Hears “/sandchest review” comments on pull requests."],
+  ["Write checks", "The RedNest check on every pull request."],
+  ["Read issues", "Hears the existing “/sandchest review” slash command on pull requests."],
   ["Read organisation members", "Knows who administers an organisation, for its settings."],
   ["Read email addresses", "Emails people about critical findings."],
 ] as const;
@@ -76,7 +76,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
   return (
     <SetupShell title="Create your GitHub App.">
       <p className="sign-in-body">
-        Sandchest reviews pull requests as a GitHub App that you own. GitHub creates it from these settings and asks you to confirm. Then this page shows its keys, once.
+        RedNest reviews pull requests as a GitHub App that you own. GitHub creates it from these settings and asks you to confirm. Then this page shows its keys, once.
       </p>
       <SetupForm appUrl={base} redirectUrl={origin.redirectUrl} state={newState()} />
       <section className="setup-asks" aria-labelledby="asks-title">

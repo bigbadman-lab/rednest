@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { LlmError, LlmQuotaError, type ChatDelta } from "../src/llm";
+import { createLlmClient, LlmError, LlmQuotaError, modelSupportsReasoningEffort, type ChatDelta } from "../src/llm";
 import { mockEndpoint, sse, textReply } from "./helpers";
 
 const endpoint = mockEndpoint();
@@ -42,6 +42,38 @@ describe("chat", () => {
     await client.chat({ ...ask, role: "recon", reasoningEffort: "low" });
 
     expect(endpoint.requests.map((request) => request.body.reasoning_effort)).toEqual(["high", undefined, "low"]);
+  });
+
+  test("omits reasoning_effort for GPT-4.1, including explicit overrides", async () => {
+    endpoint.respond(...Array.from({ length: 4 }, () => () => sse(textReply("ok"))));
+    const gpt41 = createLlmClient({ ...endpoint.config, model: "gpt-4.1" }, { retryBaseMs: 1 });
+    await gpt41.chat(ask);
+    await gpt41.chat({ ...ask, role: "skeptic", reasoningEffort: "high" });
+
+    const mini = createLlmClient({ ...endpoint.config, model: "openai/gpt-4.1-mini-2025-04-14" }, { retryBaseMs: 1 });
+    await mini.chat(ask);
+
+    const perRole = createLlmClient(
+      { ...endpoint.config, model: "model-a", models: { recon: "model-a", hunt: "gpt-4.1-nano", skeptic: "model-a", structure: "model-a" } },
+      { retryBaseMs: 1 },
+    );
+    await perRole.chat(ask);
+
+    expect(endpoint.requests.map((request) => request.body.reasoning_effort)).toEqual([undefined, undefined, undefined, undefined]);
+    expect(endpoint.requests.map((request) => request.body.model)).toEqual([
+      "gpt-4.1",
+      "gpt-4.1",
+      "openai/gpt-4.1-mini-2025-04-14",
+      "gpt-4.1-nano",
+    ]);
+  });
+
+  test("keeps reasoning_effort for reasoning-capable and other compatible models", async () => {
+    endpoint.respond(...Array.from({ length: 3 }, () => () => sse(textReply("ok"))));
+    for (const model of ["o3", "o4-mini", "abliterated-hunt"]) {
+      await createLlmClient({ ...endpoint.config, model }, { retryBaseMs: 1 }).chat(ask);
+    }
+    expect(endpoint.requests.map((request) => request.body.reasoning_effort)).toEqual(["high", "high", "high"]);
   });
 
   test("assembles tool calls streamed across chunks", async () => {
@@ -178,6 +210,23 @@ describe("failures", () => {
     endpoint.respond(...Array.from({ length: 2 }, () => () => sse([{ error: { message: "overloaded" } }])));
     const error = await endpoint.client({ maxAttempts: 2 }).chat(ask).catch((e: unknown) => e);
     expect((error as LlmError).message).toContain("overloaded");
+  });
+});
+
+describe("modelSupportsReasoningEffort", () => {
+  test.each([
+    ["gpt-4.1", false],
+    ["GPT-4.1", false],
+    ["gpt-4.1-mini", false],
+    ["gpt-4.1-nano", false],
+    ["gpt-4.1-2025-04-14", false],
+    ["openai/gpt-4.1-mini-2025-04-14", false],
+    ["o3", true],
+    ["o4-mini", true],
+    ["model-a", true],
+    ["gpt-4o", true],
+  ])("%s → %s", (model, supported) => {
+    expect(modelSupportsReasoningEffort(model)).toBe(supported);
   });
 });
 

@@ -43,7 +43,7 @@ export function renderPageMarkdown(page: MarkdownPage, body: string, base: strin
   return `# ${page.title}${summary}\n\n${text}\n`;
 }
 
-/** `/llms.txt`: what Sandchest is, and every docs page as a link to its Markdown. */
+/** `/llms.txt`: what RedNest is, and every docs page as a link to its Markdown. */
 export function renderLlmsIndex(pages: MarkdownPage[], base: string, draft = legalDraft): string {
   const policies = draft
     ? []
@@ -51,7 +51,7 @@ export function renderLlmsIndex(pages: MarkdownPage[], base: string, draft = leg
   return [
     `# ${site.name}`,
     "",
-    "> Sandchest is an open-source GitHub App that reads your code the way an attacker would, finds exploitable vulnerabilities, and gives you a fix prompt for your coding agent.",
+    "> RedNest is an open-source GitHub App that reads your code the way an attacker would, finds exploitable vulnerabilities, and gives you a fix prompt for your coding agent.",
     "",
     `Each page below is Markdown; drop the \`.md\` for the web page. Every page in one file: ${base}/llms-full.txt`,
     "",

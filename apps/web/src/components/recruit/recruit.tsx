@@ -65,7 +65,7 @@ const PANEL_CUT_MS = 120;
 const ROOM_LIGHT: Record<StepId, number> = { connect: 0.55, company: 0.55, hacker: 1.15, plan: 0.55, pay: 0.25 };
 
 /** The brand's gold, for the card form's focus rings: the page is lit in gold, only the room in the screen's colour. */
-const GOLD = "#fec242";
+const GOLD = "#f50002";
 /** Repositories listed before "Show all". */
 const REPOS_SHOWN = 8;
 /** An image that loads nothing, for pictures in a loading state's sample. */
@@ -102,7 +102,7 @@ type Payment = { state: "idle" | "opening" | "failed" } | ({ state: "ready" | "p
 const usd = (amount: number) => `$${amount.toFixed(2)}`;
 
 /**
- * Setting up Sandchest like a game's character creation. The hacker's room
+ * Setting up RedNest like a game's character creation. The hacker's room
  * fills the screen; one panel down its dark left side holds the step you're
  * on, with the way forward always at the panel's foot. Connect GitHub, say
  * who the company is and where to look first, make the hacker, choose the
@@ -494,8 +494,8 @@ export function Recruit({ accounts, initial, startAt, viewer, installUrl, billin
 
       <header className="onboard-top">
         {/* Signed out there is no dashboard to go back to: the mark and the way out lead home. */}
-        <Link href={signIn ? "/" : "/dashboard?later=1"} className="onboard-mark" aria-label={signIn ? "Sandchest home" : "Sandchest dashboard"}>
-          <img src="/sandchest-logo-dark.svg" alt="" width={120} height={22} />
+        <Link href={signIn ? "/" : "/dashboard?later=1"} className="onboard-mark" aria-label={signIn ? "RedNest home" : "RedNest dashboard"}>
+          <img src="/red.png" alt="" width={120} height={30} />
         </Link>
         <Progress steps={steps} step={step} canEnter={canEnter} go={go} />
         <div className="onboard-exits">
@@ -1210,7 +1210,7 @@ function Pay({
         <p className="onboard-bill-secure">
           <Lock />
           <span>
-            Processed by <strong>Stripe</strong>. Sandchest never sees your card.
+            Processed by <strong>Stripe</strong>. RedNest never sees your card.
           </span>
         </p>
       </div>
@@ -1425,8 +1425,8 @@ export function RecruitSkeleton({ billing, payOnPage, install }: { billing: bool
     <div className="onboard" aria-busy="true">
       <div className="onboard-shade" aria-hidden="true" />
       <header className="onboard-top">
-        <Link href="/dashboard?later=1" prefetch={false} className="onboard-mark" aria-label="Sandchest dashboard">
-          <img src="/sandchest-logo-dark.svg" alt="" width={120} height={22} />
+        <Link href="/dashboard?later=1" prefetch={false} className="onboard-mark" aria-label="RedNest dashboard">
+          <img src="/red.png" alt="" width={120} height={30} />
         </Link>
         <Progress steps={steps} step={step} canEnter={() => false} go={noop} />
         <Link href="/dashboard?later=1" prefetch={false} className="onboard-leave">

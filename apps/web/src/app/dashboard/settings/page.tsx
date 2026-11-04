@@ -7,7 +7,7 @@ import { config } from "@/server/config";
 import { db } from "@/server/db";
 import { SettingsView } from "./settings-view";
 
-export const metadata: Metadata = { title: "Settings · Sandchest" };
+export const metadata: Metadata = { title: "Settings · RedNest" };
 
 export default async function SettingsPage() {
   const user = await viewer();

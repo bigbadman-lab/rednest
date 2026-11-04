@@ -10,7 +10,7 @@ import { autumn } from "@/server/billing";
 import { db } from "@/server/db";
 import { ConfirmView } from "./confirm-view";
 
-export const metadata: Metadata = { title: "Confirm · Sandchest" };
+export const metadata: Metadata = { title: "Confirm · RedNest" };
 
 /** Shows exactly what a plan change or credits will charge the card on file, before charging it. */
 export default async function ConfirmPage({ searchParams }: { searchParams: Promise<{ org?: string; plan?: string; credits?: string; topup?: string; purchase?: string }> }) {

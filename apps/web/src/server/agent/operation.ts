@@ -43,7 +43,7 @@ export interface Operation<S extends z.ZodObject = z.ZodObject> {
   readOnly?: boolean;
   destructive?: boolean;
   idempotent?: boolean;
-  /** Reaches outside Sandchest (Stripe, GitHub). */
+  /** Reaches outside RedNest (Stripe, GitHub). */
   openWorld?: boolean;
   run(context: Context, input: z.output<S>): Promise<unknown>;
 }
@@ -73,13 +73,13 @@ export const RepoRef = z
   .max(200)
   .describe("The repository: its id, or its full name as `owner/name`.");
 
-/** A GitHub account Sandchest is installed on: its id, or its GitHub login. */
+/** A GitHub account RedNest is installed on: its id, or its GitHub login. */
 export const AccountRef = z
   .string()
   .trim()
   .min(1)
   .max(100)
-  .describe("The GitHub account (user or organization) Sandchest is installed on: its id, or its GitHub login.");
+  .describe("The GitHub account (user or organization) RedNest is installed on: its id, or its GitHub login.");
 
 export const Uuid = (what: string) => z.uuid().describe(`The ${what}'s id.`);
 

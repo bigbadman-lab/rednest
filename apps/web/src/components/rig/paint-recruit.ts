@@ -21,7 +21,7 @@ export interface RecruitModel {
   profile: HackerProfile;
   /** The GitHub login of whoever is recruiting. */
   viewer: string;
-  /** The accounts Sandchest is installed on that they can set up. */
+  /** The accounts RedNest is installed on that they can set up. */
   accounts: string[];
   repos: BriefingRepo[];
   /** The repository to scan first. */
@@ -79,7 +79,7 @@ export function recruitPainter(model: { current: RecruitModel }): Painter {
 }
 
 function prompt(kit: Kit, user: string, y: number, command: string, since: number, rate = 26): number {
-  const head = `${user}@sandchest:~$ `;
+  const head = `${user}@rednest:~$ `;
   const w = kit.text(PAD, y, head, { px: PX, kind: "bold" });
   const shown = typed(command, since, rate);
   kit.text(PAD + w, y, shown, { px: PX });
@@ -87,7 +87,7 @@ function prompt(kit: Kit, user: string, y: number, command: string, since: numbe
   return PAD + w + kit.ctx.measureText(shown).width;
 }
 
-/** `gh auth status`, then the accounts Sandchest can reach, or waiting for one. */
+/** `gh auth status`, then the accounts RedNest can reach, or waiting for one. */
 function authStatus(kit: Kit, t: number, since: number, m: RecruitModel) {
   const user = shellUser(m.profile.handle);
   let y = PAD + 40;
@@ -95,12 +95,12 @@ function authStatus(kit: Kit, t: number, since: number, m: RecruitModel) {
   if (since < 0.6) return;
   kit.text(PAD, (y += ROW * 1.4), "github.com", { px: PX, kind: "bold" });
   kit.text(PAD + 28, (y += ROW), `\u2713 Logged in to github.com account ${m.viewer}`, { px: PX, alpha: 0.9, max: kit.W - PAD * 2 - 28 });
-  kit.text(PAD + 28, (y += ROW), "- Sandchest reads code; it never pushes", { px: PX, alpha: 0.6 });
-  const end = prompt(kit, user, (y += ROW * 1.6), "sandchest installs", since - 1);
+  kit.text(PAD + 28, (y += ROW), "- RedNest reads code; it never pushes", { px: PX, alpha: 0.6 });
+  const end = prompt(kit, user, (y += ROW * 1.6), "rednest installs", since - 1);
   if (since < 1.5) return kit.cursor(end + 4, y, t, PX);
   if (m.accounts.length === 0) {
     kit.text(PAD, (y += ROW), "no installations yet", { px: PX, alpha: 0.7 });
-    const wait = prompt(kit, user, (y += ROW * 1.6), "gh app install sandchest", since - 1.8);
+    const wait = prompt(kit, user, (y += ROW * 1.6), "gh app install rednest", since - 1.8);
     kit.text(PAD, y + ROW, `waiting for github${".".repeat(1 + (Math.floor(t * 2) % 3))}`, { px: PX, alpha: 0.7 });
     return kit.cursor(wait + 4, y, t, PX);
   }
@@ -193,7 +193,7 @@ function neofetch(kit: Kit, t: number, since: number, m: RecruitModel) {
   ];
   const x = 640;
   let y = PAD + 130;
-  kit.text(x, y, `${user}@sandchest`, { px: 26, kind: "bold" });
+  kit.text(x, y, `${user}@rednest`, { px: 26, kind: "bold" });
   kit.text(x, (y += 30), "-".repeat(user.length + 10), { px: 26, alpha: 0.6 });
   rows.forEach(([key, value], i) => {
     if (since < 0.45 + i * 0.06) return;
@@ -214,7 +214,7 @@ function contract(kit: Kit, t: number, since: number, m: RecruitModel) {
   const title = "CONTRACT(7)";
   let y = PAD + 30;
   kit.text(PAD, y, title, { px: PX, kind: "bold" });
-  kit.text(kit.W / 2, y, "Sandchest Manual", { px: PX, align: "center", alpha: 0.8 });
+  kit.text(kit.W / 2, y, "RedNest Manual", { px: PX, align: "center", alpha: 0.8 });
   kit.text(kit.W - PAD, y, title, { px: PX, kind: "bold", align: "right" });
 
   const section = (heading: string, body: string[]) => {

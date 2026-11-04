@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { setupPrompt } from "@/lib/agent-prompt";
 
-/** Copies the prompt that has the person's own agent set Sandchest up. */
+/** Copies the prompt that has the person's own agent set RedNest up. */
 /** `icon` draws a copy mark after the label that turns to a tick once copied. */
 export function AgentPromptButton({
   className,

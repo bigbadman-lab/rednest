@@ -91,7 +91,7 @@ export function protectedResourceMetadata(resource: string) {
     authorization_servers: [appUrl()],
     bearer_methods_supported: ["header"],
     scopes_supported: [SCOPE],
-    resource_name: "Sandchest",
+    resource_name: "RedNest",
     resource_documentation: `${appUrl()}/docs/agents`,
   };
 }
@@ -156,7 +156,7 @@ export type AuthorizeRequest = { clientId: string; clientName: string; redirectU
  */
 export async function checkAuthorize(params: Record<string, string | undefined>): Promise<{ ok: true; request: AuthorizeRequest } | { ok: false; show: string } | { ok: false; redirect: string }> {
   const client = params.client_id ? await oauthClient(db(), params.client_id) : undefined;
-  if (!client) return { ok: false, show: "This app isn't registered with Sandchest. Ask it to connect again." };
+  if (!client) return { ok: false, show: "This app isn't registered with RedNest. Ask it to connect again." };
   const redirectUri = params.redirect_uri ?? (client.redirectUris.length === 1 ? client.redirectUris[0] : undefined);
   if (!redirectUri || !client.redirectUris.includes(redirectUri)) return { ok: false, show: "This app asked to send you somewhere it didn't register. Nothing was shared." };
   const back = (error: string, description: string) => ({ ok: false as const, redirect: withParams(redirectUri, { error, error_description: description, state: params.state, iss: appUrl() }) });

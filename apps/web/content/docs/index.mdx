@@ -1,9 +1,9 @@
 ---
 title: Getting started
-description: Have your coding agent set Sandchest up, or install it on GitHub yourself, and get your first findings.
+description: Have your coding agent set RedNest up, or install it on GitHub yourself, and get your first findings.
 ---
 
-Sandchest is a GitHub App that reads your code the way an attacker would. It reviews your pull requests, scans whole repositories when you ask, and reports only vulnerabilities it can back with evidence: the way in, the path through your code, a proof of concept, and a fix prompt for your coding agent.
+RedNest is a GitHub App that reads your code the way an attacker would. It reviews your pull requests, scans whole repositories when you ask, and reports only vulnerabilities it can back with evidence: the way in, the path through your code, a proof of concept, and a fix prompt for your coding agent.
 
 It only ever scans repositories where you have installed it.
 
@@ -12,32 +12,32 @@ It only ever scans repositories where you have installed it.
 The quickest way in. Paste this into Claude Code, Cursor, Codex or any other agent (or press **Set up with your agent** on the home page to copy it):
 
 ```text
-Set up Sandchest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.sandchest.com).
-Read https://www.sandchest.com/docs/agents.md and follow it. Connect to its MCP server (https://www.sandchest.com/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
-Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection, installing the GitHub App, and paying on Stripe if there are no free credits.
+Set up RedNest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.rednest.tech).
+Read https://www.rednest.tech/docs/agents.md and follow it. Connect to its MCP server (https://www.rednest.tech/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
+Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection and installing the GitHub App. Do not assume payment or free credits are available.
 ```
 
-Your agent connects, sets everything up, starts the first deep scan and fixes what it finds in your checkout. You step in three times at most: approving the connection in your browser, choosing repositories on GitHub, and paying on Stripe if there are no free credits. Once connected, it can do anything the dashboard does: see [Use it from your agent](/docs/agents).
+Your agent connects, sets everything up, and can start scans and fix what it finds in your checkout. You step in where a person has to: approving the connection in your browser and choosing repositories on GitHub. Billing and token access are being revised. Once connected, it can do anything the dashboard does: see [Use it from your agent](/docs/agents).
 
 ## Or set it up yourself
 
-1. **Sign in with GitHub.** Go to [Get started](/get-started) and press **Continue with GitHub**. Sandchest uses your GitHub sign-in to see which repositories you can access.
-2. **Install the GitHub App.** From [Repos](/dashboard/repos), choose **Add repositories**, pick the account (yours or an organization) and the repositories Sandchest may read. You come back to Sandchest when GitHub is done.
-3. **Join the plan for that account.** It's $1 a month, and credits are $1 each, less when you buy more at once; your first deep scan is free. The GitHub account you installed on is the customer, so each account has its own plan and credits. Only an admin of the organization (or the owner of a personal account) can join. Payment is handled by Stripe. See [Pricing & credits](/docs/pricing).
-4. **Recon maps each repository.** As soon as the account has a plan, Sandchest builds a threat model of every repository: its entry points, trust boundaries, sensitive data and dangerous code. It takes about a minute per repository and is free.
+1. **Sign in with GitHub.** Go to [Get started](/get-started) and press **Continue with GitHub**. RedNest uses your GitHub sign-in to see which repositories you can access.
+2. **Install the GitHub App.** From [Repos](/dashboard/repos), choose **Add repositories**, pick the account (yours or an organization) and the repositories RedNest may read. You come back to RedNest when GitHub is done.
+3. **Billing for that account.** Hosted access may change; the current product still includes a credits module documented under [Pricing & credits](/docs/pricing). The GitHub account you installed on is the customer. Only an admin of the organization (or the owner of a personal account) can manage billing.
+4. **Recon maps each repository.** Once the account is ready to scan, RedNest builds a threat model of every repository: its entry points, trust boundaries, sensitive data and dangerous code. It takes about a minute per repository.
 5. **Start scanning.** Open a repository from [Repos](/dashboard/repos) and press **Deep scan** to scan all of it, and open a pull request to see a review. The [Overview](/dashboard) adds up reviews, findings and fixes across every repository, and [Scans](/dashboard/scans) lists every run. Findings appear on the [scan's live feed](/docs/scans#deep-scans) as soon as they survive verification.
 
 From then on pull requests are reviewed automatically (except drafts, some pull requests from forks, and any while the account has no plan or credits; see [PR reviews](/docs/scans#pr-reviews)), and pushes to your default branch check whether open findings have been fixed.
 
 ## Where findings show up
 
-- **On the pull request.** A Check called **Sandchest** reports what the review found. On private repositories each finding is also posted as a review comment on the vulnerable line. On public repositories, where Checks and comments are visible to everyone, Sandchest only posts a count with a link to view the details privately. See [PR reviews](/docs/scans#pr-reviews).
+- **On the pull request.** A Check called **RedNest** reports what the review found. On private repositories each finding is also posted as a review comment on the vulnerable line. On public repositories, where Checks and comments are visible to everyone, RedNest only posts a count with a link to view the details privately. See [PR reviews](/docs/scans#pr-reviews).
 - **In the dashboard.** [Findings](/dashboard/findings) lists everything across your repositories. Each finding has the full attack path, a proof of concept and a fix prompt.
 - **By email.** People who have signed in and can push to the repository get an email about new critical findings and finished deep scans. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
 
 ## Who can see what
 
-Sandchest follows GitHub. You can see a repository's findings, and deep scan it, if GitHub says you have push access or higher. Billing belongs to the GitHub account: organization admins, or the owner of a personal account, can change the plan. There are no separate Sandchest invites or roles.
+RedNest follows GitHub. You can see a repository's findings, and deep scan it, if GitHub says you have push access or higher. Billing belongs to the GitHub account: organization admins, or the owner of a personal account, can change the plan. There are no separate RedNest invites or roles.
 
 ## Next steps
 
@@ -45,4 +45,4 @@ Sandchest follows GitHub. You can see a repository's findings, and deep scan it,
 - [How scans work](/docs/scans): what each scan does, and when it runs.
 - [Findings & severity](/docs/findings): how findings are rated and what to do with them.
 - [Fixing with your agent](/docs/fixing): hand a finding to Cursor, Claude Code or Codex.
-- [Self-hosting](/docs/self-hosting): run Sandchest on your own infrastructure.
+- [Self-hosting](/docs/self-hosting): run RedNest on your own infrastructure.

@@ -1,15 +1,15 @@
 ---
 title: Privacy policy
-description: What we collect when you use the hosted Sandchest service, why, and what we never keep.
+description: What we collect when you use the hosted RedNest service, why, and what we never keep.
 ---
 
 import { legal } from "@/lib/legal";
 
-Sandchest is run by {legal.entity} ("Cap", "we", "us"), of {legal.address}. This policy explains how we handle information when you use the hosted Sandchest service. We are the controller of the personal information described here.
+RedNest is run by {legal.entity} ("Cap", "we", "us"), of {legal.address}. This policy explains how we handle information when you use the hosted RedNest service. We are the controller of the personal information described here.
 
 The short version: **we never store your source code.** Every scan runs in a temporary environment that's deleted when the scan finishes. Model inference runs with zero data retention. We keep only your findings and the minimum code excerpts needed to explain them. We don't sell personal information.
 
-A self-hosted Sandchest sends nothing to us, so this policy doesn't apply to it.
+A self-hosted RedNest sends nothing to us, so this policy doesn't apply to it.
 
 ## What we collect
 
@@ -25,7 +25,7 @@ A self-hosted Sandchest sends nothing to us, so this policy doesn't apply to it.
 
 **From billing**: your plan, credit balance and auto top-up settings. Payments are made to Stripe through our billing provider, Autumn. We never see or store your card number.
 
-**From using the site and the dashboard**: first-party usage events, which we store ourselves. They record the pages you view, with any IDs removed from the address, and how long each was on screen. They also record the links and tracked buttons you click, the steps of signing up you reach, and actions such as starting a scan, buying credits or copying a fix prompt, with whether each one went through. A page view also records the site that sent you (its domain only), any campaign tags in the link, your device type (phone, tablet or desktop) and your country. Events are tied to a random ID kept in a cookie, and to your account once you sign in, so we can see how people find and use Sandchest. They hold opaque IDs, counts and categories only: never code, finding contents, repository names, names, email addresses or IP addresses.
+**From using the site and the dashboard**: first-party usage events, which we store ourselves. They record the pages you view, with any IDs removed from the address, and how long each was on screen. They also record the links and tracked buttons you click, the steps of signing up you reach, and actions such as starting a scan, buying credits or copying a fix prompt, with whether each one went through. A page view also records the site that sent you (its domain only), any campaign tags in the link, your device type (phone, tablet or desktop) and your country. Events are tied to a random ID kept in a cookie, and to your account once you sign in, so we can see how people find and use RedNest. They hold opaque IDs, counts and categories only: never code, finding contents, repository names, names, email addresses or IP addresses.
 
 **From agents you connect**: the name the agent or you gave it, when it was last used, and a hash of its key or token (never the key itself). Changes an agent makes through the API are recorded as usage events like the ones above: which action, whether it went through, and whether it came over MCP or HTTP.
 
@@ -41,7 +41,7 @@ A self-hosted Sandchest sends nothing to us, so this policy doesn't apply to it.
 
 During a scan, code is read in the temporary workspace and sent to the model that analyses it. Our policy is to use model inference with zero data retention: the provider we use is set up not to keep prompts or outputs.
 
-Sandchest adds no account, repository, organization or user identifiers to prompts. But your code goes to the model as it is, so anything written in it does too, such as names, email addresses or URLs in comments.
+RedNest adds no account, repository, organization or user identifiers to prompts. But your code goes to the model as it is, so anything written in it does too, such as names, email addresses or URLs in comments.
 
 We don't use your code, findings or prompts to train models.
 
@@ -61,11 +61,11 @@ We don't sell or share personal information for advertising, and we don't send m
 
 ## Public repositories
 
-Checks and review comments on public repositories are visible to everyone. For public repositories Sandchest posts only a count of findings by severity, and keeps the details in the dashboard.
+Checks and review comments on public repositories are visible to everyone. For public repositories RedNest posts only a count of findings by severity, and keeps the details in the dashboard.
 
 ## Who we share it with
 
-We use a small number of service providers (subprocessors) to host the service, run model inference, send email and process payments. They act on our instructions and only to provide Sandchest. The current list is available on request at <Email to={legal.email} />.
+We use a small number of service providers (subprocessors) to host the service, run model inference, send email and process payments. They act on our instructions and only to provide RedNest. The current list is available on request at <Email to={legal.email} />.
 
 We disclose information to authorities only when the law requires it, and to a buyer or successor if Cap is involved in a merger, acquisition or sale of assets, under this policy.
 
@@ -83,7 +83,7 @@ We're based in the United States, and information is processed there and whereve
 
 Depending on where you live, you may have the right to access, correct, export or delete your personal information, and to object to or restrict how we use it. Write to <Email to={legal.email} /> and we'll respond within 30 days. We won't treat you differently for using these rights. You can also complain to your local data protection authority.
 
-Sandchest isn't for children, and we don't knowingly collect information from anyone under 16.
+RedNest isn't for children, and we don't knowingly collect information from anyone under 16.
 
 ## Security
 

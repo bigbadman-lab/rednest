@@ -148,7 +148,7 @@ export const findingOps = [
     name: "get_fix_prompt",
     title: "Get a fix prompt",
     description:
-      "The ready-to-run prompt that fixes an open finding: hand it to a coding agent (or follow it yourself) in a checkout of the repository. It names the vulnerable code, the fix, what must keep working, and a regression test to add. Once the fix is merged to the default branch, Sandchest checks it and marks the finding fixed.",
+      "The ready-to-run prompt that fixes an open finding: hand it to a coding agent (or follow it yourself) in a checkout of the repository. It names the vulnerable code, the fix, what must keep working, and a regression test to add. Once the fix is merged to the default branch, RedNest checks it and marks the finding fixed.",
     method: "GET",
     path: "/findings/{id}/fix-prompt",
     input: z.object({ id: Uuid("finding") }),
@@ -166,7 +166,7 @@ export const findingOps = [
     name: "update_finding",
     title: "Fix, dismiss or reopen a finding",
     description:
-      'Records the person\'s decision on a finding. status "dismissed" needs a reason (false_positive, accepted_risk, wont_fix); "fixed" marks it fixed by hand (Sandchest also detects fixes merged to the default branch); "open" reopens a fixed or dismissed one. Resolving a finding deletes its code excerpts and fix prompt.',
+      'Records the person\'s decision on a finding. status "dismissed" needs a reason (false_positive, accepted_risk, wont_fix); "fixed" marks it fixed by hand (RedNest also detects fixes merged to the default branch); "open" reopens a fixed or dismissed one. Resolving a finding deletes its code excerpts and fix prompt.',
     method: "PATCH",
     path: "/findings/{id}",
     input: z.object({
