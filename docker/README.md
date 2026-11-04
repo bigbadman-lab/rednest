@@ -1,22 +1,24 @@
-# Self-hosting Sandchest
+# Self-hosting RedNest
 
-A self-hosted Sandchest sends nothing to us. There's no telemetry and no billing, and plans and credits are switched off. The safety limits stay. Each repository gets one deep scan a day, each account runs at most two scans at a time, and repositories over a million lines aren't scanned.
+A self-hosted RedNest install sends nothing to rednest.tech. There's no telemetry and no billing, and plans and credits are switched off. The safety limits stay. Each repository gets one deep scan a day, each account runs at most two scans at a time, and repositories over a million lines aren't scanned.
 
 You get two containers: `web`, which serves the dashboard and webhooks and runs scans, and `postgres`. You also get a GitHub App of your own, created in one click by the server's setup page.
+
+> This Docker stack inherits environment variable names (`SANDCHEST_*`) and package identifiers from the upstream [Sandchest](https://github.com/CapSoftware/Sandchest) project. That is intentional for compatibility; it is not the hosted RedNest brand.
 
 ## What you need
 
 - **Docker** with the Compose plugin (`docker compose version` 2.20 or newer).
 - **A machine with 2 or more CPUs and 4 GB of memory.** Each scan clones one repository into a temporary directory and indexes it, so leave disk space for your largest repository.
 - **A public HTTPS address** that GitHub can send webhooks to: a domain with a reverse proxy, or a tunnel for a trial (see [Giving GitHub a way in](#giving-github-a-way-in)).
-- **A model endpoint** that speaks the standard chat-completions protocol (`POST /chat/completions`), with streaming, tool calls and strict JSON-schema output. Sandchest is tuned for a fast model that reasons on request and caches long prompts.
+- **A model endpoint** that speaks the standard chat-completions protocol (`POST /chat/completions`), with streaming, tool calls and strict JSON-schema output. RedNest is tuned for a fast model that reasons on request and caches long prompts.
 - **A GitHub account**, or owner rights on the organisation that will own the App.
 
 ## Start it
 
 ```sh
-git clone https://github.com/CapSoftware/Sandchest.git
-cd Sandchest/docker
+git clone https://github.com/bigbadman-lab/rednest.git
+cd rednest/docker
 cp .env.example .env
 ```
 
@@ -24,7 +26,7 @@ Fill in the required values in `docker/.env`:
 
 | Setting | What to put |
 |---|---|
-| `SANDCHEST_APP_URL` | The public HTTPS address, such as `https://sandchest.example.com`. No trailing slash. |
+| `SANDCHEST_APP_URL` | The public HTTPS address, such as `https://rednest.example.com`. No trailing slash. |
 | `BETTER_AUTH_SECRET` | `openssl rand -hex 32` |
 | `POSTGRES_PASSWORD` | `openssl rand -hex 32`. Use letters and digits only, and set it before the first start: the database keeps the password it was created with. |
 | `LLM_BASE_URL` | The endpoint's base URL, including the version segment, such as `https://models.example.com/v1`. |
@@ -48,7 +50,7 @@ docker compose logs web | grep setup
 ```
 
 ```
-Sandchest is not connected to GitHub yet. To create its GitHub App, open https://sandchest.example.com/setup/unlock?token=…
+RedNest is not connected to GitHub yet. To create its GitHub App, open https://rednest.example.com/setup/unlock?token=…
 ```
 
 1. **Open the link** on your public address, or on the same machine at `http://localhost:3000/setup/unlock?token=…`. Without the token, `/setup` asks for it and shows nothing else.
@@ -63,7 +65,7 @@ Sandchest is not connected to GitHub yet. To create its GitHub App, open https:/
 
    The setup page disappears once the App is configured.
 6. **Install the App** on the repositories to review, using the link on the keys page (`https://github.com/apps/<your-app>/installations/new`).
-7. **Sign in** at your address with GitHub. Sandchest builds a threat model of each repository first, in a minute or two. From then on, every pull request gets a Sandchest check, and private repositories get inline review comments.
+7. **Sign in** at your address with GitHub. RedNest builds a threat model of each repository first, in a minute or two. From then on, every pull request gets a RedNest check, and private repositories get inline review comments.
 
 The App asks GitHub for these permissions: read code, metadata, issues, organisation members and email addresses; write pull requests and checks. It subscribes to pull request, push and issue comment events. GitHub sends installation events to every App without asking.
 
@@ -82,14 +84,14 @@ Put the `https://….trycloudflare.com` address it prints into `SANDCHEST_APP_UR
 **To keep it, use a domain and a reverse proxy with TLS** on the same machine. With Caddy, for example:
 
 ```
-sandchest.example.com {
+rednest.example.com {
 	reverse_proxy 127.0.0.1:3000
 }
 ```
 
 The proxy must pass the original `Host` header. Caddy does; with nginx, add `proxy_set_header Host $host;`. The setup page shows the address GitHub will send you back to, so check it before you continue.
 
-Don't put a shared cache in front of Sandchest that keys on the URL alone. The landing page at `/` differs for signed-in people (it shows a Dashboard button), and Sandchest sends no `Vary: Cookie`. A plain proxy like the ones above is fine.
+Don't put a shared cache in front of RedNest that keys on the URL alone. The landing page at `/` differs for signed-in people (it shows a Dashboard button), and the app sends no `Vary: Cookie`. A plain proxy like the ones above is fine.
 
 To listen on every interface instead, set `SANDCHEST_BIND=0.0.0.0` in `.env`. Set `SANDCHEST_PORT` to use another port.
 
@@ -115,12 +117,12 @@ If the address changes later, update `SANDCHEST_APP_URL`, restart, and in the Ap
 - The workflow engine's internal route (`/.well-known/workflow/…`) has no authentication of its own. The server only answers it on loopback inside the container; from outside it is a 404, however the path is written.
 - Postgres is not published on any port. The app connects as a role that owns its database but is not a superuser.
 - The base images are pinned by digest, so rebuilding the same commit uses the same images. The two Alpine packages the image adds are not pinned: Alpine keeps only the latest build of each package, so a pinned version would stop installing at its next security fix.
-- Sandchest sends nothing to us. Next.js telemetry is off, and billing stays off because no billing key is set. Your code goes only to GitHub and to your model endpoint.
+- RedNest sends nothing to rednest.tech. Next.js telemetry is off, and billing stays off because no billing key is set. Your code goes only to GitHub and to your model endpoint.
 
 ## Upgrading
 
 ```sh
-cd Sandchest
+cd rednest
 git pull
 cd docker
 docker compose up -d --build
@@ -130,7 +132,7 @@ The server migrates the database before it starts, so there is nothing else to r
 
 ## Backups
 
-Everything Sandchest keeps is in the database: findings, threat models, scan history and the dashboard's sessions. Code is never stored. Keep `docker/.env` safe too, since it holds the App's private key.
+Everything RedNest keeps is in the database: findings, threat models, scan history and the dashboard's sessions. Code is never stored. Keep `docker/.env` safe too, since it holds the App's private key.
 
 ```sh
 # Back up
@@ -146,7 +148,7 @@ docker compose up -d
 
 **Compose says a required variable is missing.** Fill it in `docker/.env`; the message names the setting.
 
-**The `web` container keeps restarting.** A setting is invalid, for example a `SANDCHEST_ADMIN_TOKEN` under 24 characters. `docker compose logs web` names it after "Sandchest cannot start".
+**The `web` container keeps restarting.** A setting is invalid, for example a `SANDCHEST_ADMIN_TOKEN` under 24 characters. `docker compose logs web` names the failing setting (log text may still say "Sandchest cannot start" from the upstream process name).
 
 **There's no setup link in the log.** The log says what is missing instead: `SANDCHEST_APP_URL`, or `BETTER_AUTH_SECRET` (32 or more characters). After a restart, run `docker compose logs web | grep setup` again. If the App is already configured, there is no setup link.
 
@@ -185,4 +187,4 @@ docker/test/e2e.sh
 
 ## Creating the App for a hosted service
 
-The same setup page creates an App that other accounts can install. Run Sandchest on your own machine, with `SANDCHEST_APP_URL` set to the service's public address and no `GITHUB_APP_ID`. Open setup on `http://localhost:<port>`, so GitHub returns the keys to your machine. Choose "Any account" under "Who can install it". Then put the keys in the service's environment.
+The same setup page creates an App that other accounts can install. Run RedNest on your own machine, with `SANDCHEST_APP_URL` set to the service's public address and no `GITHUB_APP_ID`. Open setup on `http://localhost:<port>`, so GitHub returns the keys to your machine. Choose "Any account" under "Who can install it". Then put the keys in the service's environment.
