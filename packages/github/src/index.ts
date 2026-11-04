@@ -12,7 +12,7 @@ export {
   type PullFile,
   type ReviewComment,
 } from "./app";
-export { GitHubError, githubPaginate, githubRequest, type HttpOptions } from "./client";
+export { GitHubError, githubPaginate, githubPublicRequest, githubRequest, type HttpOptions } from "./client";
 export { parsePatch, type FileDiff } from "./diff";
 export { checkResult, notReviewed, publicSentence, reviewBody, reviewComment, shown, type CheckInput } from "./render";
 export * from "./webhooks";

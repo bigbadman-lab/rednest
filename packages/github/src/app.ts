@@ -4,7 +4,7 @@
  * scoped to a single repository with read-only contents.
  */
 import { createSign } from "node:crypto";
-import { GitHubError, githubPaginate, githubRequest, type HttpOptions } from "./client";
+import { GitHubError, githubPaginate, githubPublicRequest, githubRequest, type HttpOptions } from "./client";
 
 export interface AppConfig {
   appId: string;
@@ -51,17 +51,18 @@ export class GitHubApp {
   }
 
   /**
-   * Public repository metadata via the App JWT (no installation). Used by
-   * Quick Scan before entitlement reservation. Never returns a clone token.
+   * Public repository metadata without credentials. Used by Quick Scan before
+   * entitlement reservation. App JWTs are rejected by repository endpoints
+   * (401 Bad credentials); installation tokens require an App install.
+   * Never returns a clone token.
    */
   async publicRepository(owner: string, repo: string): Promise<PublicRepository> {
-    return githubRequest<PublicRepository>(async () => appJwt(this.config), `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {}, this.http);
+    return githubPublicRequest<PublicRepository>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {}, this.http);
   }
 
-  /** Commit SHA a public branch currently points at (App JWT, no installation). */
+  /** Commit SHA a public branch currently points at (unauthenticated). */
   async publicBranchSha(owner: string, repo: string, branch: string): Promise<string> {
-    const result = await githubRequest<{ commit: { sha: string } }>(
-      async () => appJwt(this.config),
+    const result = await githubPublicRequest<{ commit: { sha: string } }>(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branch)}`,
       {},
       this.http,

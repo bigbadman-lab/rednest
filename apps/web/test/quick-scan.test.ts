@@ -34,6 +34,10 @@ const checks: Array<{ repo: string; title: string }> = [];
 
 const fakeGithub = {
   publicRepository: async (owner: string, repo: string) => {
+    if (repo === "jwt-401") throw new GitHubError("GitHub 401: Bad credentials", 401, false);
+    if (repo === "forbidden") throw new GitHubError("GitHub 403: Resource not accessible by integration", 403, false);
+    if (repo === "rate") throw new GitHubError("GitHub 403: API rate limit exceeded", 403, true);
+    if (repo === "throttle") throw new GitHubError("GitHub 429: rate limit", 429, true);
     const row = publicRepos.get(`${owner}/${repo}`);
     if (!row) throw new GitHubError("Not Found", 404, false);
     const { sha: _sha, ...meta } = row;
@@ -143,6 +147,32 @@ describe.skipIf(!available)("Quick Scan URL and metadata", () => {
     seedPublic("acme", "huge", { size: 600_000 });
     const alice = await seedUser("alice-huge", 503);
     expect(await requestQuickScan("https://github.com/acme/huge", alice.id)).toMatchObject({ ok: false, reason: "too_large" });
+  });
+
+  test("maps GitHub auth and rate-limit failures without burning free scan", async () => {
+    const alice = await seedUser("alice-map", 511);
+    expect(await resolvePublicGithubRepo("https://github.com/acme/jwt-401")).toMatchObject({
+      ok: false,
+      reason: "unavailable",
+      message: expect.stringContaining("rejected the metadata request"),
+    });
+    expect(await resolvePublicGithubRepo("https://github.com/acme/forbidden")).toMatchObject({
+      ok: false,
+      reason: "unavailable",
+      message: "GitHub refused access to this repository.",
+    });
+    expect(await resolvePublicGithubRepo("https://github.com/acme/rate")).toMatchObject({
+      ok: false,
+      reason: "unavailable",
+      message: expect.stringContaining("rate limit"),
+    });
+    expect(await resolvePublicGithubRepo("https://github.com/acme/throttle")).toMatchObject({
+      ok: false,
+      reason: "unavailable",
+      message: expect.stringContaining("rate limit"),
+    });
+    expect(await requestQuickScan("https://github.com/acme/jwt-401", alice.id)).toMatchObject({ ok: false, reason: "unavailable" });
+    expect((await getUserEntitlement(database, alice.id))?.freeScanStatus ?? "available").toBe("available");
   });
 });
 

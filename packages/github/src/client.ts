@@ -46,6 +46,16 @@ export async function githubRequest<T>(auth: () => Promise<string>, path: string
   return (await response.json()) as T;
 }
 
+/**
+ * Unauthenticated GitHub REST for public resources (e.g. Quick Scan metadata).
+ * App JWTs must not be used here: repository endpoints reject them with 401.
+ */
+export async function githubPublicRequest<T>(path: string, options: RequestOptions = {}, http: HttpOptions = {}): Promise<T> {
+  const { response } = await send(null, path, options, http);
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
 /** Follows `Link: rel="next"` until `limit` items. `pick` extracts the items from each page. */
 export async function githubPaginate<T, P = T[]>(
   auth: () => Promise<string>,
@@ -65,7 +75,7 @@ export async function githubPaginate<T, P = T[]>(
   return items.slice(0, limit);
 }
 
-async function send(auth: () => Promise<string>, path: string, options: RequestOptions, http: HttpOptions): Promise<{ response: Response }> {
+async function send(auth: (() => Promise<string>) | null, path: string, options: RequestOptions, http: HttpOptions): Promise<{ response: Response }> {
   const fetchImpl = http.fetch ?? fetch;
   const maxAttempts = http.maxAttempts ?? 4;
   const timeoutMs = http.timeoutMs ?? 30_000;
@@ -78,13 +88,14 @@ async function send(auth: () => Promise<string>, path: string, options: RequestO
     let failure: GitHubError;
     try {
       const timeout = AbortSignal.timeout(timeoutMs);
+      const token = auth ? await auth() : null;
       const response = await fetchImpl(url, {
         method: options.method ?? "GET",
         headers: {
           accept: "application/vnd.github+json",
           "x-github-api-version": "2022-11-28",
           "user-agent": "sandchest",
-          authorization: `Bearer ${await auth()}`,
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(options.body === undefined ? {} : { "content-type": "application/json" }),
           ...options.headers,
         },

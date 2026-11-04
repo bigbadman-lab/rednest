@@ -102,13 +102,66 @@ export async function resolvePublicGithubRepo(rawUrl: string): Promise<{ ok: tru
       },
     };
   } catch (error) {
-    if (error instanceof GitHubError) {
-      if (error.status === 404) return { ok: false, reason: "not_found", message: "Repository not found or not accessible." };
-      if (error.status === 403 || error.status === 401) return { ok: false, reason: "unavailable", message: "GitHub refused access to this repository." };
-    }
-    console.error(`Quick Scan metadata failed: ${describeError(error)}`);
-    return { ok: false, reason: "error", message: "Could not read this repository from GitHub." };
+    const correlationId = randomUUID();
+    const mapped = mapGithubMetadataError(error);
+    logQuickScanGithubFailure({
+      operation: "resolve_public_repo",
+      correlationId,
+      target: `${parsed.owner}/${parsed.repo}`,
+      status: error instanceof GitHubError ? error.status : null,
+      classification: mapped.classification,
+    });
+    return { ok: false, reason: mapped.reason, message: mapped.message };
   }
+}
+
+type GithubMetadataClass = "not_found" | "forbidden" | "unauthorized" | "rate_limited" | "network" | "upstream";
+
+function mapGithubMetadataError(error: unknown): {
+  reason: Extract<QuickScanResult, { ok: false }>["reason"];
+  message: string;
+  classification: GithubMetadataClass;
+} {
+  if (!(error instanceof GitHubError)) {
+    return { reason: "error", message: "Could not read this repository from GitHub.", classification: "network" };
+  }
+  if (error.status === 404) {
+    return { reason: "not_found", message: "Repository not found or not accessible.", classification: "not_found" };
+  }
+  if (error.status === 429 || (error.status === 403 && /rate limit/i.test(error.message))) {
+    return { reason: "unavailable", message: "GitHub rate limit reached. Try again in a few minutes.", classification: "rate_limited" };
+  }
+  if (error.status === 401) {
+    return { reason: "unavailable", message: "GitHub rejected the metadata request. Try again shortly.", classification: "unauthorized" };
+  }
+  if (error.status === 403) {
+    return { reason: "unavailable", message: "GitHub refused access to this repository.", classification: "forbidden" };
+  }
+  if (error.status === 0) {
+    return { reason: "error", message: "Could not reach GitHub. Try again in a minute.", classification: "network" };
+  }
+  return { reason: "error", message: "Could not read this repository from GitHub.", classification: "upstream" };
+}
+
+/** Safe structured log for Quick Scan GitHub failures — never tokens or headers. */
+function logQuickScanGithubFailure(fields: {
+  operation: string;
+  correlationId: string;
+  target: string;
+  status: number | null;
+  classification: GithubMetadataClass;
+}): void {
+  console.error(
+    JSON.stringify({
+      source: "quick_scan",
+      event: "github_metadata_failed",
+      operation: fields.operation,
+      correlationId: fields.correlationId,
+      target: fields.target,
+      httpStatus: fields.status,
+      classification: fields.classification,
+    }),
+  );
 }
 
 /**

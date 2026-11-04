@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createHmac, createVerify, generateKeyPairSync } from "node:crypto";
 import type { Finding } from "@sandchest/engine/scan";
-import { appJwt, checkResult, GitHubApp, githubPaginate, githubRequest, parsePatch, reviewBody, reviewComment, verifySignature } from "../src";
+import { appJwt, checkResult, GitHubApp, githubPaginate, githubPublicRequest, githubRequest, parsePatch, reviewBody, reviewComment, verifySignature } from "../src";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const pem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
@@ -40,6 +40,14 @@ describe("client", () => {
     const { fetch, requests } = scripted(json({ message: "Not Found" }, { status: 404 }));
     await expect(githubRequest(async () => "t", "/x", {}, { fetch, ...quick })).rejects.toThrow("GitHub 404: Not Found");
     expect(requests).toHaveLength(1);
+  });
+
+  test("public requests omit Authorization", async () => {
+    const { fetch, requests } = scripted(json({ ok: true }));
+    expect(await githubPublicRequest("/repos/acme/widget", {}, { fetch, ...quick })).toEqual({ ok: true });
+    const headers = requests[0]!.init.headers as Record<string, string>;
+    expect(headers.authorization).toBeUndefined();
+    expect(headers.accept).toBe("application/vnd.github+json");
   });
 
   test("follows pagination links", async () => {
@@ -93,6 +101,33 @@ describe("app auth", () => {
     expect(await installation.orgMembership("acme", "dave")).toBeNull();
     await expect(installation.orgMembership("acme", "erin")).rejects.toThrow("403");
     expect(requests[1]!.url).toBe("https://api.github.com/orgs/acme/memberships/alice");
+  });
+
+  test("publicRepository and publicBranchSha are unauthenticated", async () => {
+    const { fetch, requests } = scripted(
+      json({
+        id: 1,
+        full_name: "acme/widget",
+        private: false,
+        default_branch: "main",
+        size: 12,
+        archived: false,
+        disabled: false,
+        fork: false,
+        owner: { login: "acme", id: 1, type: "Organization" },
+      }),
+      json({ commit: { sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }),
+    );
+    const app = new GitHubApp(config, { fetch, ...quick });
+    expect((await app.publicRepository("acme", "widget")).full_name).toBe("acme/widget");
+    expect(await app.publicBranchSha("acme", "widget", "main")).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(requests).toHaveLength(2);
+    for (const request of requests) {
+      const headers = request.init.headers as Record<string, string>;
+      expect(headers.authorization).toBeUndefined();
+    }
+    expect(requests[0]!.url).toBe("https://api.github.com/repos/acme/widget");
+    expect(requests[1]!.url).toBe("https://api.github.com/repos/acme/widget/branches/main");
   });
 
   test("a 404 getting the token (the app was uninstalled) is an error, not 'not a member'", async () => {
