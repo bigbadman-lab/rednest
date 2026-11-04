@@ -125,7 +125,7 @@ html:has(.page) {
 /* Hero */
 
 .hero {
-  padding-top: clamp(2.5rem, 8vh, 5rem);
+  padding-top: clamp(1rem, 3vh, 2rem);
 }
 
 .hero-title {
