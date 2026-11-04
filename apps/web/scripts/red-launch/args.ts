@@ -108,10 +108,11 @@ export function usage(): string {
   bun run red:launch status
   bun run red:launch register --mint <MINT> [--dry-run] [--yes]
   bun run red:launch publish [--dry-run] [--yes]
-  bun run red:launch verify --eligible <WALLET> --ineligible <WALLET>
+  bun run red:launch verify --eligible <WALLET> --ineligible <WALLET>   # optional diagnostic
   bun run red:launch activate [--dry-run] [--yes]
   bun run red:launch disable [--dry-run] [--yes]
 
 Targets only Vercel team cope2 / project rednest / production.
-Does not create tokens. Pump.fun remains the token creation platform.`;
+Does not create tokens. Pump.fun remains the token creation platform.
+activate requires mint registration, publication, healthy RPC/mint infrastructure, and confirmation — not wallet Stage C receipts.`;
 }

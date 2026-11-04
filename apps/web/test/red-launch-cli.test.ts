@@ -14,7 +14,7 @@ import {
   cmdStatus,
   cmdVerify,
 } from "../scripts/red-launch/commands";
-import { writeVerifyReceipt } from "../scripts/red-launch/state";
+import { RPC_PROBE_WALLET } from "../scripts/red-launch/solana";
 import type { EnvMap, LaunchDeps, MintOnChain } from "../scripts/red-launch/types";
 import { requireCleanApprovedRevision } from "../scripts/red-launch/source";
 import { evaluateProductionAlias, parseEnvFile } from "../scripts/red-launch/vercel";
@@ -31,6 +31,7 @@ function createHarness(init: {
   homepage?: string;
   mintOnChain?: MintOnChain | { error: string };
   pumpOk?: boolean;
+  rpcProbeFails?: boolean;
   balances?: Record<string, { whole: bigint; eligible: boolean } | { error: string }>;
 }) {
   const env: EnvMap = {
@@ -97,7 +98,14 @@ function createHarness(init: {
       },
       async checkBalance({ walletPubkey }) {
         const row = init.balances?.[walletPubkey];
-        if (!row) return { ok: false, reason: "rpc_error" };
+        if (!row) {
+          // Default empty successful probe for infrastructure checks.
+          if (walletPubkey === RPC_PROBE_WALLET) {
+            if (init.rpcProbeFails) return { ok: false, reason: "rpc_error" };
+            return { ok: true, rawAmount: 0n, decimals: 6, wholeTokens: 0n, eligible: false };
+          }
+          return { ok: false, reason: "rpc_error" };
+        }
         if ("error" in row) return { ok: false, reason: row.error as "rpc_error" };
         return {
           ok: true,
@@ -106,6 +114,14 @@ function createHarness(init: {
           wholeTokens: row.whole,
           eligible: row.eligible,
         };
+      },
+      async probeHolderInfrastructure(mintRaw, rpcUrl) {
+        if (init.rpcProbeFails) return { ok: false, error: "rpc_probe_failed:rpc_error" };
+        const onChain = await this.inspectMint(mintRaw, rpcUrl);
+        if ("error" in onChain) return { ok: false, error: onChain.error };
+        const probe = await this.checkBalance({ walletPubkey: RPC_PROBE_WALLET, mint: onChain.mint, rpcUrl });
+        if (!probe.ok) return { ok: false, error: `rpc_probe_failed:${probe.reason}` };
+        return { ok: true, mint: onChain };
       },
     },
     pump: {
@@ -341,70 +357,96 @@ describe("verify", () => {
 });
 
 describe("activate", () => {
-  test("fails without verification receipt", async () => {
+  test("succeeds without Stage C receipt when infrastructure prerequisites pass", async () => {
     const mint = await sampleMint();
     const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+    });
+    const dry = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(dry.ok).toBe(true);
+    expect(h.state.deploys).toBe(0);
+
+    const live = await cmdActivate(h.deps, { dryRun: false, yes: true });
+    expect(live.ok).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_HOLDER_SCANS_ENABLED" && s.value === "true")).toBe(true);
+    expect(h.state.deploys).toBe(1);
+  });
+
+  test("missing canonical mint blocks activation", async () => {
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: null, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not registered/i);
+  });
+
+  test("invalid mint blocks activation", async () => {
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: "not-a-mint", RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not registered|invalid/i);
+  });
+
+  test("missing RPC blocks activation", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: null, RED_HOLDER_SCANS_ENABLED: null },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/SOLANA_RPC_URL/);
+  });
+
+  test("RPC errors block activation", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+      rpcProbeFails: true,
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/rpc_probe_failed|Infrastructure/i);
+  });
+
+  test("wrong Vercel project blocks activation", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      assertError: 'Fail-closed: project "rednest" not found under team "cope2".',
       env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
     });
     const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Missing verification/);
+    if (!result.ok) expect(result.error).toContain("Fail-closed");
   });
 
-  test("fails when revalidation shows ineligible became eligible", async () => {
+  test("dry-run never mutates production", async () => {
     const mint = await sampleMint();
-    const eligible = await sampleMint();
-    const ineligible = await sampleMint();
     const h = createHarness({
       env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
-      balances: {
-        [eligible]: { whole: 50_000n, eligible: true },
-        [ineligible]: { whole: 60_000n, eligible: true },
-      },
-    });
-    writeVerifyReceipt(h.statePath, {
-      mint,
-      verifiedAt: "2026-11-04T18:00:00.000Z",
-      eligibleWallet: eligible,
-      ineligibleWallet: ineligible,
-      eligibleWholeTokens: "50000",
-      ineligibleWholeTokens: "1",
-      decimals: 6,
-      tokenProgram: "spl-token",
-      rpcConfigured: true,
-    });
-    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Revalidation failed/);
-    rmSync(h.stateDir, { recursive: true, force: true });
-  });
-
-  test("dry-run activate after successful revalidation", async () => {
-    const mint = await sampleMint();
-    const eligible = await sampleMint();
-    const ineligible = await sampleMint();
-    const h = createHarness({
-      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
-      balances: {
-        [eligible]: { whole: 50_000n, eligible: true },
-        [ineligible]: { whole: 10n, eligible: false },
-      },
-    });
-    writeVerifyReceipt(h.statePath, {
-      mint,
-      verifiedAt: "2026-11-04T18:00:00.000Z",
-      eligibleWallet: eligible,
-      ineligibleWallet: ineligible,
-      eligibleWholeTokens: "50000",
-      ineligibleWholeTokens: "10",
-      decimals: 6,
-      tokenProgram: "spl-token",
-      rpcConfigured: true,
     });
     const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
     expect(result.ok).toBe(true);
+    expect(h.sets).toEqual([]);
     expect(h.state.deploys).toBe(0);
-    rmSync(h.stateDir, { recursive: true, force: true });
+  });
+
+  test("repeated activation is idempotent", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: "true",
+      },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.logs.some((l) => /already true \(idempotent\)/.test(l))).toBe(true);
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBe("true");
   });
 });
 

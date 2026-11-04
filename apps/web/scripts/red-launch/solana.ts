@@ -9,8 +9,11 @@ import { canonicalSolanaPubkey } from "../../src/server/solana/pubkey";
 import { PUMP_COIN_URL } from "./config";
 import type { MintInspection, MintOnChain, PumpClient, SolanaClient } from "./types";
 
+/** Valid throwaway wallet used only to exercise getParsedTokenAccountsByOwner. */
+export const RPC_PROBE_WALLET = "11111111111111111111111111111111";
+
 export function createSolanaClient(): SolanaClient {
-  return {
+  const client: SolanaClient = {
     async inspectMint(mintRaw, rpcUrl) {
       const mint = canonicalSolanaPubkey(mintRaw);
       if (!mint) return { error: "invalid_mint" };
@@ -42,7 +45,23 @@ export function createSolanaClient(): SolanaClient {
     async checkBalance(input) {
       return checkRedHolderBalance(input);
     },
+
+    async probeHolderInfrastructure(mintRaw, rpcUrl) {
+      const onChain = await client.inspectMint(mintRaw, rpcUrl);
+      if ("error" in onChain) return { ok: false, error: onChain.error };
+
+      const probe = await client.checkBalance({
+        walletPubkey: RPC_PROBE_WALLET,
+        mint: onChain.mint,
+        rpcUrl,
+      });
+      if (!probe.ok) {
+        return { ok: false, error: `rpc_probe_failed:${probe.reason}` };
+      }
+      return { ok: true, mint: onChain };
+    },
   };
+  return client;
 }
 
 export function createPumpClient(fetchImpl: typeof fetch = fetch): PumpClient {

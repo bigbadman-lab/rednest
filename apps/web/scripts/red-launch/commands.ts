@@ -14,7 +14,7 @@ import {
   homepageShowsMint,
   homepageSolscanFor,
 } from "./site";
-import { readVerifyReceipt, receiptMatchesMint, writeVerifyReceipt } from "./state";
+import { writeVerifyReceipt } from "./state";
 import type { CommandResult, EnvMap, LaunchDeps, VerifyReceipt } from "./types";
 
 function envValue(env: EnvMap, key: keyof EnvMap): string | null | undefined {
@@ -307,7 +307,7 @@ export async function cmdVerify(
   };
   writeVerifyReceipt(deps.statePath, receipt);
   deps.io.log(`Wrote local verification receipt (no secrets) → ${deps.statePath}`);
-  deps.io.log("Stage C passed for this mint. Revalidation still required at activate.");
+  deps.io.log("Optional wallet diagnostic passed. Activation does not require this receipt.");
   return { ok: true, code: 0 };
 }
 
@@ -330,33 +330,13 @@ export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; ye
   const health = await deps.site.health();
   if (!health.ok) return { ok: false, code: 2, error: "Production health check failed." };
 
-  const receipt = readVerifyReceipt(deps.statePath);
-  if (!receiptMatchesMint(receipt, mint)) {
-    return {
-      ok: false,
-      code: 2,
-      error: "Missing verification for this mint. Run: bun run red:launch verify --eligible … --ineligible …",
-    };
+  const probe = await deps.solana.probeHolderInfrastructure(mint, rpc);
+  if (!probe.ok) {
+    return { ok: false, code: 2, error: `Holder infrastructure check failed: ${probe.error}` };
   }
-
-  // Revalidate Stage C against live balances (do not trust stale receipt alone).
-  const eligible = await deps.solana.checkBalance({
-    walletPubkey: receipt!.eligibleWallet,
-    mint,
-    rpcUrl: rpc,
-  });
-  const ineligible = await deps.solana.checkBalance({
-    walletPubkey: receipt!.ineligibleWallet,
-    mint,
-    rpcUrl: rpc,
-  });
-  if (!eligible.ok || !eligible.eligible || eligible.wholeTokens < 50_000n) {
-    return { ok: false, code: 3, error: "Revalidation failed: eligible wallet no longer meets the 50,000 $RED threshold." };
-  }
-  if (!ineligible.ok || ineligible.eligible || ineligible.wholeTokens >= 50_000n) {
-    return { ok: false, code: 3, error: "Revalidation failed: ineligible wallet unexpectedly meets the threshold." };
-  }
-  deps.io.log("Revalidation passed for stored Stage C wallets.");
+  deps.io.log(
+    `Infrastructure OK: mint=${probe.mint.mint} decimals=${probe.mint.decimals} program=${probe.mint.tokenProgram}; RPC balance queries succeed.`,
+  );
 
   if (flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED")) === "true") {
     deps.io.log("RED_HOLDER_SCANS_ENABLED already true (idempotent).");

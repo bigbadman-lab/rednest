@@ -64,6 +64,14 @@ export type SolanaClient = {
     mint: string;
     rpcUrl: string;
   }): Promise<RedBalanceResult>;
+  /**
+   * Confirms mint metadata and that holder balance queries succeed over RPC.
+   * Fail-closed: RPC/malformed errors never count as success.
+   */
+  probeHolderInfrastructure(
+    mint: string,
+    rpcUrl: string,
+  ): Promise<{ ok: true; mint: MintOnChain } | { ok: false; error: string }>;
 };
 
 export type PumpClient = {
