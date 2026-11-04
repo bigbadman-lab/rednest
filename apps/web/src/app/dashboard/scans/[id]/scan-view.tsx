@@ -4,7 +4,7 @@ import { Heat } from "@/components/app/heat";
 import { HoverLink, Link } from "@/components/app/hover-link";
 import { ScanClock, ScanFeed, ScanLive, ScanStatus, ScanTrack } from "@/components/app/scan-live";
 import { ScanWatch } from "@/components/app/scan-watch";
-import { compactNumber, plural, SCAN_KIND_LABEL } from "@/lib/format";
+import { compactNumber, plural, SCAN_KIND_LABEL, SEVERITIES, SEVERITY_LABEL, type Severity } from "@/lib/format";
 import { readHacker } from "@/lib/hacker";
 import type { OrgPlan } from "@/server/org-plans";
 import "../../../rig.css";
@@ -27,7 +27,12 @@ export function ScanView({ row, again, next, waitingOn }: { row: ScanRow; again?
   const { scan, repo, org, metrics, findings, events } = row;
   const live = ACTIVE.has(scan.status);
   const shown = findings.filter((finding) => finding.confidence !== "low");
-  const stats = (scan.stats ?? {}) as { loc?: number; checked?: number; fixed?: number };
+  const stats = (scan.stats ?? {}) as { loc?: number; checked?: number; fixed?: number; newFindingIds?: string[] };
+  const newIds = new Set(stats.newFindingIds ?? []);
+  const open = shown.filter((finding) => finding.status === "open");
+  const resolved = shown.filter((finding) => finding.status === "fixed" || finding.status === "dismissed");
+  const bySeverity = Object.fromEntries(SEVERITIES.map((severity) => [severity, shown.filter((finding) => finding.severity === severity).length])) as Record<Severity, number>;
+  const findingsHref = `/dashboard/findings?repo=${repo.id}`;
 
   const initial = {
     kind: scan.kind,
@@ -119,41 +124,90 @@ export function ScanView({ row, again, next, waitingOn }: { row: ScanRow; again?
           )}
         </dl>
 
+        {!live && scan.kind !== "fix_check" && (
+          <section className="block" aria-labelledby="results-title">
+            <div className="block-head">
+              <h2 id="results-title" className="block-title">
+                Results
+              </h2>
+              <Link className="quiet" href={findingsHref}>
+                View repository findings
+              </Link>
+            </div>
+            {scan.status === "failed" ? (
+              <p className="block-empty">This scan failed before a complete result was available.{scan.error ? ` ${scan.error}` : ""}</p>
+            ) : scan.status === "cancelled" || scan.status === "refused" ? (
+              <p className="block-empty">This scan did not finish, so there is no findings result to show.</p>
+            ) : shown.length === 0 ? (
+              <p className="block-empty">
+                No security findings were identified in this scan. That does not guarantee the repository is secure.
+              </p>
+            ) : (
+              <dl className="stats results-summary">
+                <div className="stat">
+                  <dt>Associated findings</dt>
+                  <dd>{shown.length}</dd>
+                </div>
+                <div className="stat">
+                  <dt>Needs review</dt>
+                  <dd>{open.length}</dd>
+                </div>
+                {resolved.length > 0 && (
+                  <div className="stat">
+                    <dt>Resolved</dt>
+                    <dd>{resolved.length}</dd>
+                  </div>
+                )}
+                {SEVERITIES.filter((severity) => bySeverity[severity] > 0).map((severity) => (
+                  <div key={severity} className="stat">
+                    <dt>{SEVERITY_LABEL[severity]}</dt>
+                    <dd>{bySeverity[severity]}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
+        )}
+
         {shown.length > 0 && (
           <section className="block" aria-labelledby="found-title">
             <h2 id="found-title" className="block-title">
-              Found
+              Findings
             </h2>
             <ul className="rows">
-              {shown.map((finding) => (
-                <li key={finding.id} className="row finding-row">
-                  <HoverLink href={`/dashboard/findings/${finding.id}`}>
-                    <Heat severity={finding.severity} label />
-                    <span className="finding-row-title">{finding.title}</span>
-                    <span className="finding-row-when">
-                      {(finding.status === "fixed" || finding.status === "dismissed") && (
-                        <span className="status status-badge" data-status={finding.status}>
-                          {finding.status === "fixed" ? "Fixed" : "Dismissed"}
+              {shown.map((finding) => {
+                const location = locationOf(finding);
+                return (
+                  <li key={finding.id} className="row finding-row">
+                    <HoverLink href={`/dashboard/findings/${finding.id}`}>
+                      <Heat severity={finding.severity} label />
+                      <span className="finding-row-title">{finding.title}</span>
+                      <span className="finding-row-when">
+                        {newIds.has(finding.id) && <span className="status status-badge">New</span>}
+                        {(finding.status === "fixed" || finding.status === "dismissed") && (
+                          <span className="status status-badge" data-status={finding.status}>
+                            {finding.status === "fixed" ? "Fixed" : "Dismissed"}
+                          </span>
+                        )}
+                        {finding.status === "open" && <span className="status status-badge">Open</span>}
+                      </span>
+                      {location && (
+                        <span className="finding-row-where">
+                          <code>{location}</code>
                         </span>
                       )}
-                    </span>
-                    {finding.sink && (
-                      <span className="finding-row-where">
-                        <code>
-                          {finding.sink.file}:{finding.sink.line}
-                        </code>
-                      </span>
-                    )}
-                  </HoverLink>
-                </li>
-              ))}
+                      {finding.impact && <span className="finding-row-when">{clip(finding.impact, 140)}</span>}
+                    </HoverLink>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
 
         <section className="block" aria-labelledby="feed-title">
           <h2 id="feed-title" className="block-title">
-            {live ? "Live" : "Log"}
+            {live ? "Live" : "Activity"}
           </h2>
           <ScanTrack />
           <ScanFeed />
@@ -161,4 +215,24 @@ export function ScanView({ row, again, next, waitingOn }: { row: ScanRow; again?
       </ScanLive>
     </>
   );
+}
+
+function locationOf(finding: ScanRow["findings"][number]): string | null {
+  const sink = finding.sink;
+  if (sink && typeof sink === "object" && "file" in sink && typeof sink.file === "string") {
+    return `${sink.file}:${typeof sink.line === "number" ? sink.line : "?"}`;
+  }
+  const entry = finding.entryPoint;
+  if (entry && typeof entry === "object" && entry !== null && "file" in entry && typeof (entry as { file: unknown }).file === "string") {
+    const file = (entry as { file: string; line?: number }).file;
+    const line = (entry as { line?: number }).line;
+    return `${file}:${typeof line === "number" ? line : "?"}`;
+  }
+  return null;
+}
+
+function clip(text: string, max: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }

@@ -170,7 +170,7 @@ export function ScanFeed() {
   return (
     <div className="feed" data-live={following ? "" : undefined}>
       <ol className="feed-lines" aria-live="polite">
-        {events.length === 0 && !following && <li className="feed-line feed-empty">Nothing was recorded for this scan.</li>}
+        {events.length === 0 && !following && <li className="feed-line feed-empty">No execution events were recorded for this scan.</li>}
         {events.length === 0 && following && status === "queued" && <li className="feed-line feed-empty">Waiting for a free slot…</li>}
         {events.map((event) => (
           <li key={event.seq} className="feed-line" data-type={event.type.split(":")[0]}>

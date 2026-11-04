@@ -84,6 +84,30 @@ async function seedUser(login: string, githubUserId: number) {
   return user!;
 }
 
+function findingSeed(repoId: string, scanId: string, fingerprint: string, severity: "critical" | "high" | "medium" | "low", title: string) {
+  return {
+    repoId,
+    fingerprint,
+    severity,
+    confidence: "high" as const,
+    category: "test",
+    title,
+    impact: `${title} impact`,
+    entryPoint: { file: "a.ts", line: 1 },
+    attackPath: [{ file: "a.ts", line: 1, note: "entry" }],
+    attacker: "remote",
+    preconditions: "none",
+    proofOfConcept: "n/a",
+    fixGuidance: "n/a",
+    guarantees: [] as string[],
+    mustNotBreak: [] as string[],
+    regressionTest: "n/a",
+    fixPrompt: "n/a",
+    sourceScanId: scanId,
+    sourceKind: "deep" as const,
+  };
+}
+
 beforeAll(async () => {
   try {
     admin = postgres(ADMIN_URL, { max: 1, onnotice: () => {} });
@@ -243,7 +267,7 @@ describe.skipIf(!available)("Quick Scan entitlements and access", () => {
         title: "Test finding",
         impact: "impact",
         entryPoint: { file: "a.ts", line: 1 },
-        attackPath: [],
+        attackPath: [{ file: "a.ts", line: 1, note: "entry" }],
         attacker: "remote",
         preconditions: "none",
         proofOfConcept: "n/a",
@@ -257,8 +281,83 @@ describe.skipIf(!available)("Quick Scan entitlements and access", () => {
       })
       .returning();
 
+    await database.$client`
+      update scans
+      set status = 'completed', finished_at = now(), stats = ${JSON.stringify({ findingIds: [finding!.id], newFindingIds: [finding!.id] })}::jsonb
+      where id = ${started.scanId}`;
+    await database.insert(schema.scanEvents).values({
+      scanId: started.scanId,
+      seq: 1,
+      type: "stage:setup",
+      message: "Starting…",
+    });
+
+    const aliceRow = await scanForUser(database, alice.id, started.scanId, { events: 100 });
+    expect(aliceRow?.findings.map((row) => row.id)).toEqual([finding!.id]);
+    expect(aliceRow?.events).toHaveLength(1);
+    expect(await scanForUser(database, bob.id, started.scanId, { events: 100 })).toBeUndefined();
+
     expect(await findingForUser(database, alice.id, finding!.id)).toBeTruthy();
     expect(await findingForUser(database, bob.id, finding!.id)).toBeUndefined();
+  });
+
+  test("scan details surface findings even when the activity feed is empty", async () => {
+    seedPublic("acme", "feedless", { id: 9_104 });
+    const alice = await seedUser("alice-feedless", 512);
+    const started = await requestQuickScan("https://github.com/acme/feedless", alice.id);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const scan = await database.query.scans.findFirst({ where: (s, { eq }) => eq(s.id, started.scanId) });
+    const rows = await database
+      .insert(schema.findings)
+      .values([
+        findingSeed(scan!.repoId, started.scanId, "qs-feed-1", "critical", "Critical one"),
+        findingSeed(scan!.repoId, started.scanId, "qs-feed-2", "medium", "Medium two"),
+      ])
+      .returning();
+    await database.$client`
+      update scans
+      set status = 'completed', finished_at = now(),
+          stats = ${JSON.stringify({ findingIds: rows.map((row) => row.id), newFindingIds: [rows[0]!.id] })}::jsonb
+      where id = ${started.scanId}`;
+
+    const detail = await scanForUser(database, alice.id, started.scanId, { events: 100 });
+    expect(detail?.scan.status).toBe("completed");
+    expect(detail?.events).toEqual([]);
+    expect(detail?.findings.map((row) => row.title)).toEqual(["Critical one", "Medium two"]);
+  });
+
+  test("completed Quick Scan with zero findings still loads for the owner", async () => {
+    seedPublic("acme", "clean", { id: 9_105 });
+    const alice = await seedUser("alice-clean", 513);
+    const started = await requestQuickScan("https://github.com/acme/clean", alice.id);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    await database.$client`
+      update scans
+      set status = 'completed', finished_at = now(), stats = ${JSON.stringify({ findingIds: [], newFindingIds: [] })}::jsonb
+      where id = ${started.scanId}`;
+    const detail = await scanForUser(database, alice.id, started.scanId, { events: 100 });
+    expect(detail?.findings).toEqual([]);
+    expect(detail?.scan.status).toBe("completed");
+  });
+
+  test("failed Quick Scan remains owner-only and does not invent findings", async () => {
+    seedPublic("acme", "broke", { id: 9_106 });
+    const alice = await seedUser("alice-broke", 514);
+    const bob = await seedUser("bob-broke", 515);
+    const started = await requestQuickScan("https://github.com/acme/broke", alice.id);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    await database.$client`
+      update scans
+      set status = 'failed', finished_at = now(), error = 'sandbox failed', stats = ${JSON.stringify({ findingIds: [] })}::jsonb
+      where id = ${started.scanId}`;
+    const detail = await scanForUser(database, alice.id, started.scanId, { events: 100 });
+    expect(detail?.scan.status).toBe("failed");
+    expect(detail?.findings).toEqual([]);
+    expect(await scanForUser(database, bob.id, started.scanId)).toBeUndefined();
   });
 
   test("Quick Scan begin/publish never creates GitHub Checks", async () => {

@@ -223,7 +223,16 @@ export function sampleScan(): NonNullable<Awaited<ReturnType<typeof scanForUser>
     metrics: null,
     findings: sampleFindings(8)
       .filter((_, i) => i === 0 || i === 1 || i === 5)
-      .map(({ id, title, severity, confidence, status, sink }) => ({ id, title, severity, confidence, status: status as "open", sink })),
+      .map(({ id, title, severity, confidence, status, sink }) => ({
+        id,
+        title,
+        severity,
+        confidence,
+        status: status as "open",
+        impact: title,
+        entryPoint: sink ? { file: sink.file, line: sink.line } : { file: "unknown", line: 1 },
+        sink,
+      })),
     events: FEED.map((message, i) => ({ seq: i + 1, type: message.startsWith("Finding") ? "finding" : "step", message, createdAt: new Date(started.getTime() + i * 63_000) })),
   };
 }

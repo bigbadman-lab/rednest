@@ -932,6 +932,29 @@ html:not([data-js]) .no-js-submit {
   color: var(--color-bright);
 }
 
+.block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.block-head .block-title {
+  margin-bottom: 0;
+}
+
+.block-empty {
+  max-width: 68ch;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.results-summary {
+  margin-top: 0;
+}
+
 .prose {
   max-width: 68ch;
   color: var(--color-muted);

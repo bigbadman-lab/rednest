@@ -429,7 +429,17 @@ export async function recordPromptsCopied(database: Db, userId: string, findingI
 
 /** A scan the user can see, with the findings it reported and its feed so far. One round trip. */
 export async function scanForUser(database: Db, userId: string, scanId: string, options: { events?: number } = {}) {
-  const visibleScan = sql`exists (select 1 from ${scans} s join ${permissionCache} pc on pc.repo_id = s.repo_id and pc.user_id = ${userId} where s.id = ${scanId})`;
+  // Must match `canSee`: installed-repo permission_cache OR Quick Scan ownership.
+  // Using permission_cache alone hid findings and the event feed for Quick Scan owners.
+  const visibleScan = sql`exists (
+    select 1 from ${scans} s
+    join ${repos} r on r.id = s.repo_id
+    where s.id = ${scanId}
+      and (
+        exists (select 1 from ${permissionCache} pc where pc.user_id = ${userId} and pc.repo_id = r.id)
+        or (r.source = 'quick_scan' and r.owner_user_id = ${userId})
+      )
+  )`;
   const [[row], found, events] = await Promise.all([
     database
       .select({
@@ -443,9 +453,18 @@ export async function scanForUser(database: Db, userId: string, scanId: string, 
       .innerJoin(orgs, eq(orgs.id, scans.orgId))
       .leftJoin(scanMetrics, eq(scanMetrics.scanId, scans.id))
       .where(and(eq(scans.id, scanId), canSee(userId))),
-    // The scan's findings are listed in its stats.
+    // The scan's findings are listed in its stats (not only source_scan_id).
     database
-      .select({ id: findings.id, title: findings.title, severity: findings.severity, confidence: findings.confidence, status: findings.status, sink: sql<{ file: string; line: number } | null>`${findings.attackPath} -> -1` })
+      .select({
+        id: findings.id,
+        title: findings.title,
+        severity: findings.severity,
+        confidence: findings.confidence,
+        status: findings.status,
+        impact: findings.impact,
+        entryPoint: findings.entryPoint,
+        sink: sql<{ file: string; line: number } | null>`${findings.attackPath} -> -1`,
+      })
       .from(findings)
       .where(and(sql`${findings.id} in (select jsonb_array_elements_text(coalesce(stats -> 'findingIds', '[]'::jsonb))::uuid from ${scans} where id = ${scanId})`, visibleScan))
       .orderBy(SEVERITY_ORDER),
