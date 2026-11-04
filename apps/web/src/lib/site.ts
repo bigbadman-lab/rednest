@@ -15,7 +15,7 @@ export const site = {
   description:
     "AI-powered security scanning for GitHub repositories. One free lifetime scan, then planned $RED holder access—no recurring fiat subscription for holder scans.",
   url: siteUrl() ?? "http://localhost:3000",
-  githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/bigbadman-lab/rednest",
+  githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/apps/rednestai",
   /** Official X (Twitter) account. */
   xUrl: "https://x.com/rednestai",
   /**
