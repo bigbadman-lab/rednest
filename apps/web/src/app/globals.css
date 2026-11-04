@@ -845,6 +845,92 @@ html:has(.page) {
   background: var(--color-gold);
 }
 
+/* Homepage $RED access + official mint panel */
+
+.red-access-points {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  max-width: 42rem;
+  list-style: none;
+  padding: 0;
+}
+
+.red-access-points li {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--color-edge) 80%, transparent);
+  background: color-mix(in srgb, #1a0f12 70%, transparent);
+}
+
+.red-access-points strong {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--color-bright);
+}
+
+.red-access-points span {
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.red-mint-panel {
+  margin-top: 1.75rem;
+  max-width: 42rem;
+  padding: 1.25rem 1.25rem 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-gold) 35%, var(--color-edge));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-rust) 18%, transparent), transparent 55%),
+    color-mix(in srgb, #140a0c 88%, var(--color-rust));
+}
+
+.red-mint-pending {
+  margin: 0;
+  color: var(--color-sand);
+  line-height: 1.55;
+}
+
+.red-mint-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  color: var(--color-gold);
+}
+
+.red-mint-address {
+  display: block;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  font-family: var(--font-mono, var(--font-geist-mono), ui-monospace, monospace);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-bright);
+  background: color-mix(in srgb, var(--color-void) 55%, transparent);
+  border: 1px solid var(--color-edge);
+}
+
+.red-mint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1rem;
+}
+
+.red-mint-link {
+  color: var(--color-sand);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.red-mint-link:hover {
+  color: var(--color-bright);
+}
+
 /*
  * How it works: four steps, each beside a small window that plays once. The
  * windows sit on alternate sides on wide screens. Every animation here moves

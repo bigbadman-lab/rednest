@@ -228,7 +228,11 @@ function contract(kit: Kit, t: number, since: number, m: RecruitModel) {
     section("SCOPE", [`${names.join(", ")}${m.repos.length > 3 ? ` and ${m.repos.length - 3} more` : ""}`]);
   }
   if (!m.billing) {
-    section("TERMS", ["Self-hosted. No plan, no credits, no limit but your own servers."]);
+    section("TERMS", [
+      "One lifetime free security scan after GitHub sign-in.",
+      "No payment details required.",
+      "After $RED launches, eligible holders unlock additional monthly scans.",
+    ]);
   } else if (!m.currentPlan && m.claim) {
     const first = m.repos.find((repo) => repo.id === m.target);
     section("SYNOPSIS", [`${m.claim} credits on the house. No card, nothing to pay.`]);

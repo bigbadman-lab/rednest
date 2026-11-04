@@ -33,6 +33,7 @@ import { RigView } from "@/components/rig/rig-view";
 import type { Painter } from "@/components/rig/screen";
 import type { ShotName } from "@/components/rig/shots";
 import { newSignals } from "@/components/rig/signals";
+import { GET_STARTED_READY_LEAD } from "@/lib/access-copy";
 import { checkDiscount, completePayment, loadBriefing, preparePayment, recruit, saveInvoiceDetails, type DiscountCheck, type RecruitInput, type RecruitOrder, type RecruitOutcome } from "@/server/recruit-actions";
 import type { LiveStats } from "@/server/stats";
 import { CardForm, type CardHandle } from "./card-form";
@@ -958,8 +959,8 @@ function Credits({
     return (
       <>
         <Title heading={heading}>You’re ready</Title>
-        <p className="onboard-lead">
-          This server runs without billing, so there’s nothing to pay. {name} starts mapping {org}’s repositories as soon as you finish.
+        <p className="onboard-lead" data-testid="get-started-ready-lead">
+          {GET_STARTED_READY_LEAD}
         </p>
       </>
     );

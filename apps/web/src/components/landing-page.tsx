@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { ChestStage } from "@/components/chest-stage";
 import { FindingStrip } from "@/components/finding-strip";
 import { HackerAtWork } from "@/components/hacker-at-work";
 import { HeroKey } from "@/components/hero-key";
 import { HowItWorks } from "@/components/how-it-works";
+import { RedAccessSection, RedAccessSectionFallback } from "@/components/red-access-section";
 import { LiveLines } from "@/components/recruit/live-lines";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { site } from "@/lib/site";
@@ -64,6 +66,10 @@ export function LandingPage({ visitor }: { visitor: Visitor }) {
         </section>
 
         <HowItWorks />
+
+        <Suspense fallback={<RedAccessSectionFallback />}>
+          <RedAccessSection />
+        </Suspense>
 
         <section className="section" aria-labelledby="example-title">
           <h2 id="example-title" className="section-title">

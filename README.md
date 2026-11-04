@@ -91,7 +91,7 @@ Required categories of configuration (see `.env.example`; leave empty in docs an
 - GitHub App credentials
 - LLM endpoint (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional per-role models)
 
-Optional holder-related variables (`RED_HOLDER_SCANS_ENABLED`, `RED_TOKEN_MINT`, `SOLANA_RPC_URL`, `NEXT_PUBLIC_REOWN_PROJECT_ID`) must stay unset or disabled until an official launch.
+Optional holder-related variables (`RED_HOLDER_SCANS_ENABLED`, `RED_TOKEN_MINT`, `RED_MINT_PUBLIC`, `SOLANA_RPC_URL`, `NEXT_PUBLIC_REOWN_PROJECT_ID`) must stay unset or disabled until an official launch. Homepage mint display also requires `RED_MINT_PUBLIC=true` and never enables holder scans by itself.
 
 ## Security
 
