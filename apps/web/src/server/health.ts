@@ -11,6 +11,7 @@
  * leaking secrets.
  */
 import { createDb, type Db } from "@sandchest/db";
+import { runtimeDatabaseUrl } from "./database-url";
 import { configurationProblem } from "./readiness";
 
 const CACHE_MS = 2_000;
@@ -47,8 +48,8 @@ export function resetHealth(): void {
 
 async function check(env: Env): Promise<HealthStatus> {
   if (configurationProblem(env)) return { ok: false, reason: "configuration" };
-  // The path the app's queries take: the pooler when there is one.
-  const url = env.DATABASE_POOLER_URL?.trim() || env.DATABASE_URL?.trim();
+  // Same URL selection as app queries (skip IPv6-only Supabase direct hosts).
+  const url = runtimeDatabaseUrl(env);
   if (!url) return { ok: false, reason: "database" };
   if (probe?.url !== url) {
     void probe?.db.$client.end({ timeout: 1 }).catch(() => {});

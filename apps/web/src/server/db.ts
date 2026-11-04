@@ -15,6 +15,7 @@
  */
 import { createDb, type Db } from "@sandchest/db";
 import { config } from "./config";
+import { runtimeDatabaseUrl } from "./database-url";
 
 let instance: Db | undefined;
 let analytics: Db | undefined;
@@ -22,7 +23,10 @@ let analytics: Db | undefined;
 /** The URL the app's queries use: the pooler when there is one. Migrations and the workflow World use their own. */
 export function appDatabaseUrl(): string {
   const settings = config();
-  return settings.DATABASE_POOLER_URL ?? settings.DATABASE_URL;
+  return runtimeDatabaseUrl({
+    DATABASE_POOLER_URL: settings.DATABASE_POOLER_URL,
+    DATABASE_URL: settings.DATABASE_URL,
+  })!;
 }
 
 /** Pages run at most four queries at once; more connections per instance would only crowd the pooler. */
