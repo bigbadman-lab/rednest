@@ -1,4 +1,5 @@
 import type { OrgBillingRow, SettingsOrg, userAgentAccess } from "@sandchest/db";
+import dynamic from "next/dynamic";
 import { AgentPromptButton } from "@/components/agent-prompt-button";
 import { AcceptSponsorshipForm } from "@/components/app/accept-sponsorship";
 import { CreateKeyForm } from "@/components/app/agent-keys";
@@ -8,11 +9,32 @@ import { Link } from "@/components/app/hover-link";
 import { InstallKey } from "@/components/app/install-key";
 import { OrgSettingsForm } from "@/components/app/org-settings";
 import { ForgetShapesForm } from "@/components/app/skeleton";
-import { WalletSettings, type WalletSettingsProps } from "@/components/app/wallet-settings";
+import type { WalletSettingsProps } from "@/components/app/wallet-settings";
 import { timeAgo } from "@/lib/format";
 import { readHacker } from "@/lib/hacker";
 import { signOut } from "@/server/actions";
 import { revokeKey } from "@/server/key-actions";
+
+/** AppKit must not SSR; hooks require createAppKit on the client first. */
+const WalletSettings = dynamic(
+  () => import("@/components/app/wallet-settings").then((mod) => mod.WalletSettings),
+  {
+    ssr: false,
+    loading: () => (
+      <section id="wallet" className="account" aria-labelledby="wallet-title">
+        <div>
+          <h2 id="wallet-title" className="account-name">
+            Solana wallet
+          </h2>
+          <p className="account-role">Optional — for $RED holder scans after launch</p>
+        </div>
+        <div className="settings-form">
+          <p className="field-help">Loading wallet settings…</p>
+        </div>
+      </section>
+    ),
+  },
+);
 
 /** Where an installation's repository choice is changed on GitHub. */
 function installationUrl(org: SettingsOrg): string {
