@@ -24,6 +24,7 @@ Confirmed in this codebase and available on the hosted product unless noted:
 | Security findings, reports, and dashboard views | Implemented |
 | Pull request security reviews and Checks | Implemented |
 | Agent / MCP access (`/api/mcp`) and HTTP API with device flow | Implemented |
+| Solana wallet connect + server-side ownership verification (Settings) | Implemented |
 | Self-hosting via Docker | Implemented (see [docker/README.md](docker/README.md)) |
 | Lifetime free scan entitlement (one per GitHub account) | Implemented |
 | $RED holder eligibility (≥ 50,000 tokens, 50 scans / UTC month) | Built in code; **not active** until official token launch |

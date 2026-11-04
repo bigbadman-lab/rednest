@@ -7,6 +7,7 @@ export * from "./dashboard";
 export * from "./billing";
 export * from "./entitlements";
 export * from "./quick-scans";
+export * from "./wallets";
 export * from "./recruit";
 export * from "./events";
 export * from "./learning";

@@ -651,6 +651,7 @@ export const quickScans = pgTable(
 /**
  * Wallet bindings for RED-04D. Unique active wallet per user and per pubkey;
  * changing a wallet must not reset entitlements (those live on user_entitlements).
+ * An active row must have verified_at set (enforced in migration CHECK).
  */
 export const userWallets = pgTable(
   "user_wallets",
@@ -662,12 +663,40 @@ export const userWallets = pgTable(
     walletPubkey: text("wallet_pubkey").notNull(),
     active: boolean("active").notNull().default(true),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     uniqueIndex("user_wallets_one_active_per_user").on(table.userId).where(sql`${table.active} = true`),
     uniqueIndex("user_wallets_one_active_per_pubkey").on(table.walletPubkey).where(sql`${table.active} = true`),
+  ],
+);
+
+/**
+ * Single-use Solana message-signing challenges. Bound to the Better Auth
+ * session and intended pubkey; consumed on successful verify.
+ */
+export const walletChallenges = pgTable(
+  "wallet_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    walletPubkey: text("wallet_pubkey").notNull(),
+    nonce: text("nonce").notNull().unique(),
+    message: text("message").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("wallet_challenges_user_idx").on(table.userId),
+    index("wallet_challenges_session_idx").on(table.sessionId),
   ],
 );
 

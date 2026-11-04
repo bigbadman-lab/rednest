@@ -8,6 +8,7 @@ import { Link } from "@/components/app/hover-link";
 import { InstallKey } from "@/components/app/install-key";
 import { OrgSettingsForm } from "@/components/app/org-settings";
 import { ForgetShapesForm } from "@/components/app/skeleton";
+import { WalletSettings, type WalletSettingsProps } from "@/components/app/wallet-settings";
 import { timeAgo } from "@/lib/format";
 import { readHacker } from "@/lib/hacker";
 import { signOut } from "@/server/actions";
@@ -33,12 +34,14 @@ export function SettingsView({
   billing,
   access,
   appUrl,
+  wallet,
 }: {
   user: { image: string | null; login: string | null; name: string };
   orgs: SettingsOrg[];
   billing: Array<OrgBillingRow | null> | null;
   access: AgentAccess;
   appUrl: string;
+  wallet: WalletSettingsProps;
 }) {
   return (
     <>
@@ -164,6 +167,8 @@ export function SettingsView({
           </div>
         </div>
       </section>
+
+      <WalletSettings {...wallet} />
 
       <section className="account" aria-labelledby="you">
         <div>

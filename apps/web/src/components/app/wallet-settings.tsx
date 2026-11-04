@@ -1,0 +1,182 @@
+"use client";
+
+/**
+ * Compact Settings wallet section: connect via Reown AppKit, sign a server
+ * challenge, show verified status. Holder scanning copy stays fail-closed.
+ */
+import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import type { Provider } from "@reown/appkit-adapter-solana/react";
+import { useEffect, useState, useTransition } from "react";
+import { disconnectWallet, requestWalletChallenge, verifyWalletChallenge } from "@/server/wallet-actions";
+import { ensureWalletAppKit } from "./wallet-appkit";
+
+export type WalletSettingsProps = {
+  wallet: { pubkey: string; verifiedAt: string } | null;
+  holderStatus: "eligible" | "no_wallet" | "insufficient_balance" | "not_activated" | "unavailable";
+  holderLaunchActive: boolean;
+  monthlyAllowance: number;
+};
+
+function shortPubkey(pubkey: string): string {
+  return pubkey.length <= 12 ? pubkey : `${pubkey.slice(0, 4)}…${pubkey.slice(-4)}`;
+}
+
+export function WalletSettings(props: WalletSettingsProps) {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [wallet, setWallet] = useState(props.wallet);
+
+  useEffect(() => {
+    setReady(ensureWalletAppKit());
+  }, []);
+
+  const { open } = useAppKit();
+  const { address, isConnected } = useAppKitAccount({ namespace: "solana" });
+  const { walletProvider } = useAppKitProvider<Provider>("solana");
+
+  function run(label: string, work: () => Promise<void>) {
+    setError(null);
+    startTransition(() => {
+      void work().catch(() => setError(`Could not ${label}. Try again.`));
+    });
+  }
+
+  async function verifyConnected() {
+    if (!address || !walletProvider) {
+      setError("Connect a Solana wallet first.");
+      return;
+    }
+    const challenge = await requestWalletChallenge(address);
+    if (!challenge.ok) {
+      setError(challenge.error === "invalid_wallet" ? "That wallet address is not valid." : "Could not start verification.");
+      return;
+    }
+    const encoded = new TextEncoder().encode(challenge.message);
+    const signed = await walletProvider.signMessage(encoded);
+    const signature =
+      typeof signed === "string"
+        ? signed
+        : Buffer.from(signed instanceof Uint8Array ? signed : new Uint8Array(signed as ArrayBuffer)).toString("base64");
+    const verified = await verifyWalletChallenge({
+      challengeId: challenge.challengeId,
+      walletPubkey: address,
+      signature,
+    });
+    if (!verified.ok) {
+      const messages: Record<string, string> = {
+        invalid_signature: "Signature did not match. Sign the exact message from RedNest.",
+        wallet_taken: "That wallet is already verified on another RedNest account.",
+        challenge_expired: "The verification message expired. Try again.",
+        challenge_consumed: "That verification message was already used.",
+      };
+      setError(messages[verified.error] ?? "Verification failed.");
+      return;
+    }
+    setWallet({ pubkey: verified.walletPubkey, verifiedAt: verified.verifiedAt });
+  }
+
+  async function onDisconnect() {
+    const result = await disconnectWallet();
+    if (!result.ok) {
+      setError("Could not disconnect the wallet.");
+      return;
+    }
+    setWallet(null);
+  }
+
+  return (
+    <section id="wallet" className="account" aria-labelledby="wallet-title">
+      <div>
+        <h2 id="wallet-title" className="account-name">
+          Solana wallet
+        </h2>
+        <p className="account-role">Optional — for $RED holder scans after launch</p>
+      </div>
+      <div className="settings-form">
+        <div>
+          <p className="field-legend">Holder requirement</p>
+          <p className="field-help">
+            After launch, chargeable scans beyond your free lifetime scan need a verified wallet holding at least 50,000 $RED.
+            Allowance: {props.monthlyAllowance} holder scans per UTC month. GitHub remains your RedNest identity.
+          </p>
+          {!props.holderLaunchActive && (
+            <p className="field-help">$RED holder scanning is not active yet.</p>
+          )}
+        </div>
+
+        <div>
+          <p className="field-legend">Verified wallet</p>
+          {wallet ? (
+            <>
+              <p className="field-help">
+                <code title={wallet.pubkey}>{shortPubkey(wallet.pubkey)}</code>
+                <span className="tag">verified</span>
+                <span className="field-help"> {new Date(wallet.verifiedAt).toISOString().slice(0, 10)}</span>
+              </p>
+              <div className="hero-actions" style={{ gap: "0.5rem", marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  className="key key-secondary"
+                  disabled={pending || !ready}
+                  data-track="wallet-replace"
+                  onClick={() =>
+                    run("replace wallet", async () => {
+                      if (!isConnected) await open({ view: "Connect", namespace: "solana" });
+                      await verifyConnected();
+                    })
+                  }
+                >
+                  <span className="key-face">Replace wallet</span>
+                </button>
+                <button
+                  type="button"
+                  className="key key-secondary"
+                  disabled={pending}
+                  data-track="wallet-disconnect"
+                  onClick={() => run("disconnect", onDisconnect)}
+                >
+                  <span className="key-face">Disconnect</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="field-help">No verified Solana wallet on this account.</p>
+              <div className="hero-actions" style={{ gap: "0.5rem", marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  className="key key-primary"
+                  disabled={pending || !ready}
+                  data-track="wallet-connect"
+                  onClick={() =>
+                    run("connect wallet", async () => {
+                      if (!ready) {
+                        setError("Wallet connect is not configured.");
+                        return;
+                      }
+                      if (!isConnected) await open({ view: "Connect", namespace: "solana" });
+                      await verifyConnected();
+                    })
+                  }
+                >
+                  <span className="key-face">{isConnected ? "Sign to verify" : "Connect Solana wallet"}</span>
+                </button>
+              </div>
+            </>
+          )}
+          {error && (
+            <p className="field-help" role="alert" style={{ marginTop: "0.75rem" }}>
+              {error}
+            </p>
+          )}
+          {!ready && (
+            <p className="field-help" style={{ marginTop: "0.75rem" }}>
+              Wallet connect needs NEXT_PUBLIC_REOWN_PROJECT_ID.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -9,7 +9,14 @@ export default function Loading() {
   const { orgs, billing } = sampleSettings();
   return (
     <PageSkeleton id="settings" label="Loading settings">
-      <SettingsView user={{ image: null, login: "you", name: "You" }} orgs={orgs} billing={billingEnabled() ? [billing] : null} access={[]} appUrl={config().SANDCHEST_APP_URL.replace(/\/$/, "")} />
+      <SettingsView
+        user={{ image: null, login: "you", name: "You" }}
+        orgs={orgs}
+        billing={billingEnabled() ? [billing] : null}
+        access={[]}
+        appUrl={config().SANDCHEST_APP_URL.replace(/\/$/, "")}
+        wallet={{ wallet: null, holderStatus: "not_activated", holderLaunchActive: false, monthlyAllowance: 50 }}
+      />
     </PageSkeleton>
   );
 }

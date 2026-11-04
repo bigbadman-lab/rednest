@@ -16,6 +16,7 @@ import {
   type ReserveOutcome,
 } from "@sandchest/db";
 import { db } from "./db";
+import { resolveHolderEligibility } from "./holder-eligibility";
 
 export type EntitlementErrorCode =
   | "auth_required"
@@ -38,16 +39,16 @@ export class EntitlementError extends Error {
   }
 }
 
-/** Holder check for $RED. Production is always inactive until RED-04D. */
+/** Holder check for $RED. Fail-closed until launch env enables a verified mint. */
 export type HolderStatus = "eligible" | "no_wallet" | "insufficient_balance" | "not_activated" | "unavailable";
 
 export type HolderEligibilityProvider = (userId: string) => Promise<HolderStatus> | HolderStatus;
 
-let holderProvider: HolderEligibilityProvider = () => "not_activated";
+let holderProvider: HolderEligibilityProvider = resolveHolderEligibility;
 
 /** Tests only: inject a holder eligibility provider. Never enable mocks in production. */
 export function setHolderEligibilityProvider(provider: HolderEligibilityProvider | undefined): void {
-  holderProvider = provider ?? (() => "not_activated");
+  holderProvider = provider ?? resolveHolderEligibility;
 }
 
 export async function checkHolderEligibility(userId: string): Promise<HolderStatus> {
