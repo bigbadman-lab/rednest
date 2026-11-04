@@ -11,6 +11,12 @@ export interface DbOptions {
   connectTimeout?: number;
   /** Seconds an unused connection stays open. Default 20. */
   idleTimeout?: number;
+  /**
+   * Seconds before a connection is recycled. Useful behind serverless and
+   * session-mode poolers so idle sockets do not linger until the pooler
+   * hits its client cap. Unset keeps postgres.js defaults (no max lifetime).
+   */
+  maxLifetime?: number;
   /** Names the connections in `pg_stat_activity`, so their load can be told apart. */
   applicationName?: string;
 }
@@ -25,6 +31,7 @@ export function createDb(url: string, options: DbOptions = {}): Db {
     prepare: false,
     idle_timeout: options.idleTimeout ?? 20,
     connect_timeout: options.connectTimeout ?? 10,
+    ...(options.maxLifetime !== undefined ? { max_lifetime: options.maxLifetime } : {}),
     onnotice: () => {},
     ...(options.applicationName ? { connection: { application_name: options.applicationName } } : {}),
   });

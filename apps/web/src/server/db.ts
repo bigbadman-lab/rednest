@@ -29,11 +29,20 @@ export function appDatabaseUrl(): string {
   })!;
 }
 
-/** Pages run at most four queries at once; more connections per instance would only crowd the pooler. */
-const APP_POOL_SIZE = 4;
+/**
+ * Per-instance pool size. On Vercel each suspended isolate can still hold
+ * idle sockets briefly; keep this at 1 so many concurrent lambdas do not
+ * multiply toward the pooler's client cap. Local/self-host may open a few.
+ */
+const APP_POOL_SIZE = process.env.VERCEL ? 1 : 4;
 
 export function db(): Db {
-  return (instance ??= createDb(appDatabaseUrl(), { max: APP_POOL_SIZE, applicationName: "sandchest" }));
+  return (instance ??= createDb(appDatabaseUrl(), {
+    max: APP_POOL_SIZE,
+    idleTimeout: process.env.VERCEL ? 5 : 20,
+    maxLifetime: process.env.VERCEL ? 60 : undefined,
+    applicationName: "sandchest",
+  }));
 }
 
 export function analyticsDb(): Db {
@@ -41,6 +50,7 @@ export function analyticsDb(): Db {
     max: 1,
     idleTimeout: 5,
     connectTimeout: 5,
+    maxLifetime: process.env.VERCEL ? 60 : undefined,
     applicationName: "sandchest-analytics",
   }));
 }

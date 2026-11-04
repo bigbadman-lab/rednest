@@ -4,6 +4,7 @@ import { Avatar } from "@/components/app/avatar";
 import { HackerLink } from "@/components/app/hacker-link";
 import { AppNav } from "@/components/app/nav";
 import { readHacker } from "@/lib/hacker";
+import { brandAsset } from "@/lib/site";
 import type { Viewer } from "@/server/access";
 import { myHackers } from "@/server/hackers";
 
@@ -22,7 +23,7 @@ export function AppHeader({ user }: { user: Viewer }) {
     <header className="app-header">
       <div className="shell">
         <Link href="/dashboard" className="app-mark" aria-label="RedNest">
-          <img src="/rednest-icon-small.svg" alt="" width={30} height={28} />
+          <img src={brandAsset("/red.png")} alt="RedNest" width={120} height={30} />
         </Link>
         <AppNav links={NAV_LINKS} />
         <div className="app-user">

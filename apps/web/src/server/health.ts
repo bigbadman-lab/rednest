@@ -53,7 +53,7 @@ async function check(env: Env): Promise<HealthStatus> {
   if (!url) return { ok: false, reason: "database" };
   if (probe?.url !== url) {
     void probe?.db.$client.end({ timeout: 1 }).catch(() => {});
-    probe = { url, db: createDb(url, { max: 1, connectTimeout: TIMEOUT_MS / 1000 }) };
+    probe = { url, db: createDb(url, { max: 1, connectTimeout: TIMEOUT_MS / 1000, idleTimeout: 5, maxLifetime: 60 }) };
   }
   const client = probe.db.$client;
   let timer: ReturnType<typeof setTimeout> | undefined;
