@@ -34,6 +34,9 @@ target/
 .sandchest/
 tmp/
 
+# Local $RED launch verification receipts (no secrets, still operator-local)
+.red-launch/
+
 # OS / editor
 .DS_Store
 *.log
