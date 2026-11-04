@@ -155,6 +155,7 @@ describe("runScan", () => {
     expect(report.leads.map((lead) => lead.kind)).toEqual(["secret"]);
     expect(events.some((event) => event.type === "finding")).toBe(true);
     expect(report.warnings).toEqual([]);
+    expect(report.completeness).toBe("complete");
   });
 
   test("a bug nobody can set off on purpose is dropped without citations, as no vulnerability", async () => {
@@ -192,7 +193,26 @@ describe("runScan", () => {
     const report = await scan(fakeClient(hunter));
     expect(report.findings).toHaveLength(1);
     expect(report.stats.hunters.filter((h) => h.error)).toHaveLength(1);
-    expect(report.warnings.some((w) => w.includes("stopped early") && w.includes("upstream exploded"))).toBe(true);
+    expect(report.completeness).toBe("partial");
+    expect(report.warnings.some((w) => w.includes("stopped early") && !w.includes("upstream exploded"))).toBe(true);
+    expect(report.stats.hunters.some((h) => h.error?.includes("upstream exploded"))).toBe(true);
+  });
+
+  test("rate-limit hunter failures are partial and sanitized for the feed", async () => {
+    let calls = 0;
+    const hunter: Script = (request) => {
+      if (calls++ === 0) {
+        throw new LlmError(
+          "Model request failed with 429: Rate limit reached for gpt-4.1 in organization org-secret on tokens per min (TPM): Limit 450000",
+          { retryable: false, status: 429 },
+        );
+      }
+      return request.messages.some((m) => m.role === "tool") ? reply("done") : reply("", [toolCall("report_finding", candidate)]);
+    };
+    const report = await scan(fakeClient(hunter));
+    expect(report.completeness).toBe("partial");
+    expect(report.warnings.some((w) => /AI capacity was unavailable/.test(w))).toBe(true);
+    expect(report.warnings.every((w) => !/org-secret|450000/.test(w))).toBe(true);
   });
 
   test("quota errors stop the whole scan", async () => {

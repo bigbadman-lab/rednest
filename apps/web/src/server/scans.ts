@@ -248,7 +248,20 @@ export async function executeScan(scanId: string): Promise<{ findings: number }>
     await updateScan(db(), scan.id, {
       credits,
       leads: storableLeads(report.leads),
-      stats: { findingIds: ids, newFindingIds: newIds, timings: report.timings, review: report.review, warnings: report.warnings, loc: report.repo.loc },
+      stats: {
+        findingIds: ids,
+        newFindingIds: newIds,
+        timings: report.timings,
+        review: report.review,
+        warnings: report.warnings,
+        loc: report.repo.loc,
+        completeness: report.completeness,
+        hunters: {
+          total: report.stats.hunters.length,
+          completed: report.stats.hunters.filter((hunter) => !hunter.error).length,
+          failed: report.stats.hunters.filter((hunter) => !!hunter.error).length,
+        },
+      },
     });
     if (scan.kind === "deep") await markDeepScanned(db(), scan.repo.id, new Date(), report.repo.loc);
     return { findings: ids.length };

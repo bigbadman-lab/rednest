@@ -1,4 +1,4 @@
-export { createLlmClient, type LlmClient, type LlmClientOptions } from "./client";
+export { createLlmClient, type LlmClient, type LlmClientOptions, type LlmRetryInfo } from "./client";
 export { loadLlmConfig, ROLE_REASONING, modelSupportsReasoningEffort, type LlmConfig } from "./config";
 export {
   createClassifier,
@@ -10,7 +10,7 @@ export {
   type ClassifierAnswer,
   type ClassifierResult,
 } from "./classifier";
-export { LlmError, LlmQuotaError } from "./errors";
+export { LlmError, LlmQuotaError, parseRetryAfter, parseRetryHintFromBody } from "./errors";
 export { generateObject, StructuredOutputError, type GenerateObjectOptions, type GenerateObjectResult } from "./structured";
 export { defineTool, parseToolCall, toJsonSchema, type ParsedToolCall, type Tool } from "./tools";
 export * from "./types";

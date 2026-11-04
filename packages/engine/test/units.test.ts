@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { defineTool, loadLlmConfig, parseToolCall, type Tool, type ToolCall } from "../src/llm";
-import { parseRetryAfter } from "../src/llm/errors";
+import { parseRetryAfter, parseRetryHintFromBody } from "../src/llm/errors";
 import { readSse } from "../src/llm/sse";
 import { streamOf } from "./helpers";
 
@@ -66,6 +66,14 @@ describe("parseRetryAfter", () => {
     expect(parseRetryAfter(new Headers({ "retry-after": "2" }))).toBe(2000);
     expect(parseRetryAfter(new Headers({ "retry-after": "Thu, 01 Jan 1970 00:00:05 GMT" }), 1000)).toBe(4000);
     expect(parseRetryAfter(new Headers())).toBeUndefined();
+  });
+});
+
+describe("parseRetryHintFromBody", () => {
+  test("reads OpenAI try-again hints from the error body", () => {
+    expect(parseRetryHintFromBody("Please try again in 351ms. Visit https://platform.openai.com")).toBe(351);
+    expect(parseRetryHintFromBody("Please try again in 1.104s. Visit https://platform.openai.com")).toBe(1104);
+    expect(parseRetryHintFromBody("no hint here")).toBeUndefined();
   });
 });
 

@@ -111,6 +111,12 @@ export interface ScanReport {
   review?: { files: number; changedLines: number; reviewedFiles: string[]; skippedFiles: string[] };
   usage: { byRole: Record<string, RoleUsage>; total: RoleUsage; costUsd?: number };
   warnings: string[];
+  /**
+   * Whether every hunter finished without a contained failure.
+   * `partial` means some analysis areas stopped early (e.g. rate limits);
+   * findings that were produced are still valid.
+   */
+  completeness: "complete" | "partial";
 }
 
 export class ScanRefusedError extends Error {
@@ -141,8 +147,9 @@ export async function runScan(options: ScanOptions): Promise<ScanReport> {
       fatal ??= { error: signal.aborted && !controller.signal.aborted ? signal.reason : error };
       controller.abort(fatal.error);
     } else {
-      emit({ type: "warning", message: `${what}: ${errorMessage(error)}` });
+      emit({ type: "warning", message: publicWarning(what, error) });
     }
+    // Full detail stays in the returned hunter error for server logs/metrics; UI sees the emit above.
     return errorMessage(error);
   };
   const { indexer } = options;
@@ -327,8 +334,8 @@ export async function runScan(options: ScanOptions): Promise<ScanReport> {
     Promise.all(
       assignments.map((assignment) =>
         runHunter(ctx, assignment, registry, hunterLimits, onCandidate).catch((error): HunterStats => {
-          const message = contain(error, `The ${assignment.name} hunter stopped early`);
-          return { name: assignment.name, turns: 0, toolCalls: 0, reported: 0, accepted: 0, ms: 0, error: message };
+          const detail = contain(error, assignment.name);
+          return { name: assignment.name, turns: 0, toolCalls: 0, reported: 0, accepted: 0, ms: 0, error: detail };
         }),
       ),
     );
@@ -416,6 +423,7 @@ export async function runScan(options: ScanOptions): Promise<ScanReport> {
   emit({ type: "stage", stage: "done", message: summary(findings) });
 
   const meter = base.meter;
+  const failedHunters = hunters.filter((hunter) => !!hunter.error);
   return {
     version: 1,
     startedAt: new Date(started).toISOString(),
@@ -439,7 +447,17 @@ export async function runScan(options: ScanOptions): Promise<ScanReport> {
     usage: { byRole: meter.byRole, total: meter.total(), costUsd: options.pricing ? meter.cost(options.pricing) : undefined },
     warnings,
     review: reviewed,
+    completeness: failedHunters.length > 0 ? "partial" : "complete",
   };
+}
+
+/** User-facing failure copy: no org ids, raw TPM dumps, or provider internals. */
+function publicWarning(task: string, error: unknown): string {
+  const detail = errorMessage(error);
+  if (/429|rate limit|tokens per min|\bTPM\b/i.test(detail)) {
+    return `This analysis task (${task}) could not finish because AI capacity was unavailable.`;
+  }
+  return `This analysis task (${task}) stopped early and did not finish.`;
 }
 
 export interface ReconResult {
@@ -509,6 +527,7 @@ function emptyReport(started: number, overview: Overview, threatModel: ThreatMod
     usage: { byRole: {}, total: none, costUsd: 0 },
     warnings: [],
     review,
+    completeness: "complete",
   };
 }
 

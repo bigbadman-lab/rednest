@@ -143,6 +143,36 @@ describe("failures", () => {
     expect(endpoint.requests).toHaveLength(2);
   });
 
+  test("retries 429 using try-again hints from the response body", async () => {
+    endpoint.respond(
+      () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "Rate limit reached for gpt-4.1 on tokens per min (TPM): Limit 450000. Please try again in 20ms.",
+            },
+          }),
+          { status: 429 },
+        ),
+      () => sse(textReply("ok")),
+    );
+    const retries: Array<{ reason: string; delayMs: number }> = [];
+    const result = await endpoint.client({ retryBaseMs: 1, retryMaxMs: 50 }).chat(ask, undefined, (info) => retries.push(info));
+    expect(result.content).toBe("ok");
+    expect(endpoint.requests).toHaveLength(2);
+    expect(retries[0]).toMatchObject({ reason: "rate_limit" });
+    expect(retries[0]!.delayMs).toBeGreaterThanOrEqual(20);
+  });
+
+  test("exhausts the retry budget instead of looping forever on 429", async () => {
+    endpoint.respond(...Array.from({ length: 20 }, () => () => new Response("slow down", { status: 429, headers: { "retry-after-ms": "30" } })));
+    const error = await endpoint.client({ maxAttempts: 2, rateLimitExtraAttempts: 2, retryBudgetMs: 40, retryMaxMs: 30 }).chat(ask).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(LlmError);
+    expect((error as LlmError).status).toBe(429);
+    expect(endpoint.requests.length).toBeGreaterThan(1);
+    expect(endpoint.requests.length).toBeLessThan(20);
+  });
+
   test("retries 5xx and truncated streams", async () => {
     endpoint.respond(
       () => new Response("down", { status: 503 }),

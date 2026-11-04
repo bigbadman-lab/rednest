@@ -8,6 +8,8 @@ export interface LlmClientOptions {
   fetch?: typeof fetch;
   /** Total attempts per request, including the first. Default 5. */
   maxAttempts?: number;
+  /** Extra attempts allowed specifically for HTTP 429 rate limits. Default 3 (8 total). */
+  rateLimitExtraAttempts?: number;
   /** Longest silence tolerated while waiting for the next byte. Default 120s. */
   idleTimeoutMs?: number;
   /** Longest a single attempt may take, even while bytes keep arriving. Default 10 minutes. */
@@ -16,6 +18,15 @@ export interface LlmClientOptions {
   retryBaseMs?: number;
   /** Upper bound for any single backoff, including server-requested delays. Default 60s. */
   retryMaxMs?: number;
+  /** Cap on cumulative retry wait for one request. Default 3 minutes. */
+  retryBudgetMs?: number;
+}
+
+export interface LlmRetryInfo {
+  attempt: number;
+  status?: number;
+  delayMs: number;
+  reason: "rate_limit" | "transient";
 }
 
 export interface LlmClient {
@@ -24,20 +35,22 @@ export interface LlmClient {
    * Sends one chat-completions request, streaming the response.
    *
    * Transient failures (network errors, timeouts, 408/409/429/5xx, truncated
-   * streams) are retried with backoff, honouring `retry-after`, for as long as
-   * nothing has been delivered to `onDelta`. Quota errors throw `LlmQuotaError`
-   * immediately.
+   * streams) are retried with backoff, honouring `retry-after` and provider
+   * body hints, for as long as nothing has been delivered to `onDelta`.
+   * Quota errors throw `LlmQuotaError` immediately.
    */
-  chat(request: ChatRequest, onDelta?: (delta: ChatDelta) => void): Promise<ChatResult>;
+  chat(request: ChatRequest, onDelta?: (delta: ChatDelta) => void, onRetry?: (info: LlmRetryInfo) => void): Promise<ChatResult>;
 }
 
 export function createLlmClient(config: LlmConfig, options: LlmClientOptions = {}): LlmClient {
   const fetchImpl = options.fetch ?? fetch;
   const maxAttempts = options.maxAttempts ?? 5;
+  const rateLimitExtraAttempts = options.rateLimitExtraAttempts ?? 3;
   const idleTimeoutMs = options.idleTimeoutMs ?? 120_000;
   const requestTimeoutMs = options.requestTimeoutMs ?? 600_000;
   const retryBaseMs = options.retryBaseMs ?? 1_000;
   const retryMaxMs = options.retryMaxMs ?? 60_000;
+  const retryBudgetMs = options.retryBudgetMs ?? 180_000;
 
   const url = `${config.baseUrl}/chat/completions`;
   const headers = {
@@ -86,9 +99,10 @@ export function createLlmClient(config: LlmConfig, options: LlmClientOptions = {
 
   return {
     config,
-    async chat(request, onDelta) {
+    async chat(request, onDelta, onRetry) {
       const body = buildBody(config, request);
       let delivered = false;
+      let waitedMs = 0;
       const emit = onDelta
         ? (delta: ChatDelta) => {
             delivered = true;
@@ -100,11 +114,24 @@ export function createLlmClient(config: LlmConfig, options: LlmClientOptions = {
         try {
           return { ...(await attempt(request, body, emit)), retries: attemptNumber - 1 };
         } catch (error) {
-          if (!(error instanceof LlmError) || !error.retryable || delivered || attemptNumber >= maxAttempts) {
-            throw error;
-          }
-          const backoff = Math.random() * Math.min(retryMaxMs, retryBaseMs * 2 ** (attemptNumber - 1));
-          await sleep(Math.min(retryMaxMs, error.options.retryAfterMs ?? backoff), request.signal);
+          if (!(error instanceof LlmError) || !error.retryable || delivered) throw error;
+          const rateLimited = error.status === 429;
+          const attemptCap = rateLimited ? maxAttempts + rateLimitExtraAttempts : maxAttempts;
+          if (attemptNumber >= attemptCap || waitedMs >= retryBudgetMs) throw error;
+
+          const cap = Math.min(retryMaxMs, retryBaseMs * 2 ** (attemptNumber - 1));
+          // Full jitter around the exponential cap; never below a positive floor when the server asked us to wait.
+          const jittered = cap / 2 + Math.random() * (cap / 2);
+          const delayMs = Math.min(retryMaxMs, Math.max(error.options.retryAfterMs ?? 0, jittered));
+          if (waitedMs + delayMs > retryBudgetMs) throw error;
+          onRetry?.({
+            attempt: attemptNumber,
+            status: error.status,
+            delayMs,
+            reason: rateLimited ? "rate_limit" : "transient",
+          });
+          await sleep(delayMs, request.signal);
+          waitedMs += delayMs;
         }
       }
     },

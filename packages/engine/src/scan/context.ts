@@ -44,8 +44,9 @@ export interface ScanLimits {
 
 export const DEFAULT_LIMITS: ScanLimits = {
   // Sized to one concurrency wave: large apps need up to 6 access-control
-  // hunters (one per ~60 routes) plus abuse, leads and the risky subsystems,
-  // all running in parallel. Small apps never reach the ceiling.
+  // hunters (one per ~60 routes) plus abuse, leads and the risky subsystems.
+  // Model requests are capped separately by `concurrency` so hunters queue
+  // rather than bursting the shared TPM budget.
   maxHunters: 12,
   hunterTurns: 24,
   turnsPerFinding: 6,
@@ -53,7 +54,9 @@ export const DEFAULT_LIMITS: ScanLimits = {
   coverageTurns: 20,
   skepticTurns: 10,
   reconTurns: 10,
-  concurrency: 12,
+  // Conservative in-process cap for GPT-4.1 TPM (~450k). Does not coordinate
+  // across Vercel instances; keep low enough that one scan stays inside budget.
+  concurrency: 4,
   maxLoc: 1_000_000,
   prMaxHunters: 3,
   prLineCap: 5_000,

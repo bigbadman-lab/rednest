@@ -27,12 +27,24 @@ export function ScanView({ row, again, next, waitingOn }: { row: ScanRow; again?
   const { scan, repo, org, metrics, findings, events } = row;
   const live = ACTIVE.has(scan.status);
   const shown = findings.filter((finding) => finding.confidence !== "low");
-  const stats = (scan.stats ?? {}) as { loc?: number; checked?: number; fixed?: number; newFindingIds?: string[] };
+  const stats = (scan.stats ?? {}) as {
+    loc?: number;
+    checked?: number;
+    fixed?: number;
+    newFindingIds?: string[];
+    warnings?: string[];
+    completeness?: "complete" | "partial";
+    hunters?: { total: number; completed: number; failed: number };
+  };
   const newIds = new Set(stats.newFindingIds ?? []);
   const open = shown.filter((finding) => finding.status === "open");
   const resolved = shown.filter((finding) => finding.status === "fixed" || finding.status === "dismissed");
   const bySeverity = Object.fromEntries(SEVERITIES.map((severity) => [severity, shown.filter((finding) => finding.severity === severity).length])) as Record<Severity, number>;
   const findingsHref = `/dashboard/findings?repo=${repo.id}`;
+  const partial =
+    stats.completeness === "partial" ||
+    (stats.hunters?.failed ?? 0) > 0 ||
+    (stats.warnings ?? []).some((warning) => /could not finish|stopped early|AI capacity was unavailable/i.test(warning));
 
   const initial = {
     kind: scan.kind,
@@ -138,33 +150,42 @@ export function ScanView({ row, again, next, waitingOn }: { row: ScanRow; again?
               <p className="block-empty">This scan failed before a complete result was available.{scan.error ? ` ${scan.error}` : ""}</p>
             ) : scan.status === "cancelled" || scan.status === "refused" ? (
               <p className="block-empty">This scan did not finish, so there is no findings result to show.</p>
-            ) : shown.length === 0 ? (
-              <p className="block-empty">
-                No security findings were identified in this scan. That does not guarantee the repository is secure.
-              </p>
             ) : (
-              <dl className="stats results-summary">
-                <div className="stat">
-                  <dt>Associated findings</dt>
-                  <dd>{shown.length}</dd>
-                </div>
-                <div className="stat">
-                  <dt>Needs review</dt>
-                  <dd>{open.length}</dd>
-                </div>
-                {resolved.length > 0 && (
-                  <div className="stat">
-                    <dt>Resolved</dt>
-                    <dd>{resolved.length}</dd>
-                  </div>
+              <>
+                {partial && (
+                  <p className="block-empty" role="status">
+                    Partial analysis: some AI hunters could not finish (often due to temporary AI capacity limits). Findings listed below were still identified; uncovered areas may remain unscanned.
+                  </p>
                 )}
-                {SEVERITIES.filter((severity) => bySeverity[severity] > 0).map((severity) => (
-                  <div key={severity} className="stat">
-                    <dt>{SEVERITY_LABEL[severity]}</dt>
-                    <dd>{bySeverity[severity]}</dd>
-                  </div>
-                ))}
-              </dl>
+                {shown.length === 0 ? (
+                  <p className="block-empty">
+                    No security findings were identified in this scan. That does not guarantee the repository is secure.
+                  </p>
+                ) : (
+                  <dl className="stats results-summary">
+                    <div className="stat">
+                      <dt>Associated findings</dt>
+                      <dd>{shown.length}</dd>
+                    </div>
+                    <div className="stat">
+                      <dt>Needs review</dt>
+                      <dd>{open.length}</dd>
+                    </div>
+                    {resolved.length > 0 && (
+                      <div className="stat">
+                        <dt>Resolved</dt>
+                        <dd>{resolved.length}</dd>
+                      </div>
+                    )}
+                    {SEVERITIES.filter((severity) => bySeverity[severity] > 0).map((severity) => (
+                      <div key={severity} className="stat">
+                        <dt>{SEVERITY_LABEL[severity]}</dt>
+                        <dd>{bySeverity[severity]}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </>
             )}
           </section>
         )}

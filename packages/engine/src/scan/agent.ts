@@ -31,6 +31,8 @@ export interface AgentOptions {
   /** Stops the loop early, e.g. once the skeptic has ruled. */
   done?: () => boolean;
   onToolCall?: (name: string, args: unknown) => void;
+  /** Fired before sleeping on a rate-limit retry (HTTP 429). */
+  onRateLimitRetry?: (attempt: number, delayMs: number) => void;
   signal?: AbortSignal;
 }
 
@@ -70,7 +72,14 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       return { messages, content: "", turns: turn - 1, toolCalls };
     }
     const result = await limiter.run(
-      () => client.chat({ role, messages, tools: specs, toolChoice: "auto", maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS, signal }),
+      () =>
+        client.chat(
+          { role, messages, tools: specs, toolChoice: "auto", maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS, signal },
+          undefined,
+          (info) => {
+            if (info.reason === "rate_limit") options.onRateLimitRetry?.(info.attempt, info.delayMs);
+          },
+        ),
       options.priority,
     );
     meter.add(role, result.usage, 1, result.retries);

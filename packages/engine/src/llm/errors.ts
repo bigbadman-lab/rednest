@@ -38,15 +38,29 @@ const MAX_ERROR_BODY = 2_000;
 export async function errorFromResponse(response: Response): Promise<LlmError> {
   const body = (await response.text().catch(() => "")).slice(0, MAX_ERROR_BODY);
   const status = response.status;
-  const message = `Model request failed with ${status}: ${extractMessage(body)}`;
+  const detail = extractMessage(body);
+  const message = `Model request failed with ${status}: ${detail}`;
 
-  if (status === 402 || (status === 429 && /quota|billing|credit/i.test(body))) {
+  if (status === 402 || (status === 429 && /insufficient_quota|billing|credit/i.test(body))) {
     return new LlmQuotaError(message, { status, retryable: false });
   }
 
   const retryable = status === 408 || status === 409 || status === 429 || status >= 500;
-  return new LlmError(message, { status, retryable, retryAfterMs: parseRetryAfter(response.headers) });
+  const retryAfterMs = parseRetryAfter(response.headers) ?? parseRetryHintFromBody(detail) ?? (status === 429 ? RATE_LIMIT_FALLBACK_MS : undefined);
+  return new LlmError(message, { status, retryable, retryAfterMs });
 }
+
+/** OpenAI TPM errors often put "Please try again in 1.1s" in the body, not Retry-After. */
+export function parseRetryHintFromBody(message: string): number | undefined {
+  const ms = message.match(/try again in\s+(\d+(?:\.\d+)?)\s*ms\b/i);
+  if (ms) return Math.max(0, Math.ceil(Number(ms[1])));
+  const sec = message.match(/try again in\s+(\d+(?:\.\d+)?)\s*s(?:ec(?:onds?)?)?\b/i);
+  if (sec) return Math.max(0, Math.ceil(Number(sec[1]) * 1000));
+  return undefined;
+}
+
+/** When a 429 has no delay hint, wait at least this long before retrying. */
+const RATE_LIMIT_FALLBACK_MS = 5_000;
 
 function extractMessage(body: string): string {
   try {

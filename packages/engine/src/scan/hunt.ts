@@ -248,6 +248,9 @@ export async function runHunter(
     maxTurns: () => Math.min(limits.maxTurns, limits.turns + limits.turnsPerFinding * stats.accepted),
     deadline: limits.deadline,
     signal: ctx.signal,
+    onRateLimitRetry: () => {
+      ctx.emit({ type: "progress", message: `AI analysis temporarily reached capacity while hunting ${assignment.name}. Retrying…` });
+    },
   });
   stats.turns = result.turns;
   stats.toolCalls = result.toolCalls;
