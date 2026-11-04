@@ -26,7 +26,7 @@ import {
 } from "@/server/setup";
 import { GET as healthGet } from "@/app/api/health/route";
 import { config, resetConfig } from "@/server/config";
-import { healthy, resetHealth } from "@/server/health";
+import { healthStatus, healthy, resetHealth } from "@/server/health";
 import { configurationProblem } from "@/server/readiness";
 import { migrateAll } from "../scripts/migrate";
 
@@ -456,7 +456,7 @@ describe("configuration", () => {
     expect(configurationProblem({ SANDCHEST_APP_URL: "https://sandchest.example.com" })).toBeUndefined();
   });
 
-  test("the health check fails while a setting is bad, and says nothing about which", async () => {
+  test("the health check fails while a setting is bad, naming only the coarse reason", async () => {
     const saved = { ...process.env };
     try {
       Object.assign(process.env, configured, { SANDCHEST_ADMIN_TOKEN: "too-short-admin-token" });
@@ -464,7 +464,7 @@ describe("configuration", () => {
       resetHealth();
       const response = await healthGet();
       expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ ok: false });
+      expect(await response.json()).toEqual({ ok: false, reason: "configuration" });
       expect(response.headers.get("cache-control")).toBe("no-store");
     } finally {
       for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
@@ -474,14 +474,31 @@ describe("configuration", () => {
     }
   });
 
+  test("on Vercel, missing sandbox indexer settings fail health as configuration, not database", async () => {
+    resetHealth();
+    const status = await healthStatus({
+      ...configured,
+      VERCEL: "1",
+      SANDCHEST_WORKSPACE: undefined,
+      SANDCHEST_INDEXER_LINUX_URL: undefined,
+      SANDCHEST_INDEXER_LINUX_SHA256: undefined,
+      SANDCHEST_INDEXER_LINUX_BIN: undefined,
+      DATABASE_URL: "postgres://sandchest:x@127.0.0.1:1/sandchest",
+    });
+    expect(status).toEqual({ ok: false, reason: "configuration" });
+  });
+
   test("before setup, the health check still fails while the database is down, and quickly", async () => {
     const setupMode = { SANDCHEST_APP_URL: "https://sandchest.example.com", BETTER_AUTH_SECRET: "s".repeat(40) };
     resetHealth();
     const started = Date.now();
-    expect(await healthy({ ...setupMode, DATABASE_URL: "postgres://sandchest:x@127.0.0.1:1/sandchest" })).toBe(false);
+    expect(await healthStatus({ ...setupMode, DATABASE_URL: "postgres://sandchest:x@127.0.0.1:1/sandchest" })).toEqual({
+      ok: false,
+      reason: "database",
+    });
     expect(Date.now() - started).toBeLessThan(3_000);
     resetHealth();
-    expect(await healthy(setupMode)).toBe(false);
+    expect(await healthStatus(setupMode)).toEqual({ ok: false, reason: "database" });
   });
 
   test("before setup, the health check passes once the database answers, and reuses the answer briefly", async () => {
