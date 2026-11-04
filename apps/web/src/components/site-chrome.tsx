@@ -9,7 +9,6 @@ import { brandAsset, site } from "@/lib/site";
 const NAV = [
   { id: "docs", label: "Docs", href: site.links.docs },
   { id: "pricing", label: "Pricing", href: site.links.pricing },
-  { id: "github", label: "Open source", href: site.githubUrl },
 ] as const;
 
 const FOOTER = [
