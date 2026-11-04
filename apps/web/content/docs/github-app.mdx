@@ -1,0 +1,38 @@
+---
+title: GitHub App
+description: Install RedNest on repositories for Dig scans, threat models, and automatic pull request security reviews.
+---
+
+The RedNest GitHub App connects repositories you choose so RedNest can map them, run manual Dig scans, review pull requests, and check fixes on the default branch.
+
+## Install
+
+1. Sign in at [Get started](/get-started).
+2. Open [Repos](/dashboard/repos) and choose **Add repositories**.
+3. Pick your personal account or an organization, then the repositories RedNest may read.
+4. Complete the install on GitHub and return to RedNest.
+
+You can change repository selection later from the installation settings link in [Settings](/dashboard/settings).
+
+## What the App enables
+
+- **Recon** — builds a threat model when a repository is ready to scan
+- **Manual Dig / deep scan** — from the repository page
+- **Automatic pull request reviews** — Checks (and inline comments on private repos)
+- **Fix checks** — when you push to the default branch
+
+See [How scans work](/docs/scans) for behaviour and limits.
+
+## Organization sponsorship
+
+Automatic PR reviews and repository mapping for an organization need an accepted **scan sponsor**: a GitHub administrator whose scan allowance funds those automatic reviews. Accept sponsorship in [Settings](/dashboard/settings). Without a sponsor, automatic org scans stay blocked even if individuals still have personal free or holder allowances for other flows.
+
+## Access
+
+RedNest follows GitHub permissions. People with push access (or higher) can see findings and start Dig scans on repositories they can push to.
+
+## Related
+
+- [Quick Scan](/docs/quick-scan) — public URLs without an App install
+- [Pricing & $RED access](/docs/pricing)
+- [Privacy & security](/docs/security)

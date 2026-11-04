@@ -1,0 +1,36 @@
+---
+title: Solana wallet verification
+description: Connect a Solana wallet, sign a server challenge, and bind ownership to your GitHub account. No token transfer required.
+---
+
+Wallet verification proves you control a Solana address and binds it to your signed-in GitHub account. It does **not** replace GitHub as your RedNest identity, and it never asks you to send tokens.
+
+[Connect Wallet](/dashboard/settings#wallet)
+
+## Connect and verify
+
+1. Sign in with GitHub.
+2. Open [Settings → Solana wallet](/dashboard/settings#wallet).
+3. Choose **Connect Solana wallet** (Reown AppKit, Solana only).
+4. Sign the exact message RedNest issued. The message is bound to your account, session, wallet, site domain, and a short expiry.
+5. After a valid signature, the wallet is stored as verified.
+
+Challenges expire after a few minutes and can be used only once. RedNest verifies the Ed25519 signature on the server.
+
+## Ownership rules
+
+- One active verified wallet per GitHub user.
+- One active wallet address globally (another account cannot claim a wallet you already verified).
+- Replacing a wallet requires a new signed challenge.
+- Disconnecting deactivates the verified wallet without resetting free or monthly scan usage history.
+
+## $RED balance
+
+Holder eligibility (when activated) reads the verified wallet’s on-chain balance for the official mint on the server. RedNest does not trust a balance reported by the browser. See [Pricing & $RED access](/docs/pricing).
+
+Token-holder scanning is not active yet. Wallet verification is available ahead of the official $RED launch. No mint address is published here until launch.
+
+## Related
+
+- [Pricing & $RED access](/docs/pricing)
+- [Getting started](/docs)

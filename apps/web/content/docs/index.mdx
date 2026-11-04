@@ -1,15 +1,15 @@
 ---
 title: Getting started
-description: Have your coding agent set RedNest up, or install it on GitHub yourself, and get your first findings.
+description: Sign in with GitHub, run your first scan, and optionally connect a Solana wallet for planned $RED holder access.
 ---
 
-RedNest is a GitHub App that reads your code the way an attacker would. It reviews your pull requests, scans whole repositories when you ask, and reports only vulnerabilities it can back with evidence: the way in, the path through your code, a proof of concept, and a fix prompt for your coding agent.
+RedNest is an AI-powered security scanner for GitHub repositories. It maps attack surface, hunts for exploitable paths, and reports findings with evidence: the way in, the path through your code, a proof of concept, and a fix prompt for your coding agent.
 
-It only ever scans repositories where you have installed it.
+You can start with a public [Quick Scan](/docs/quick-scan) (no GitHub App install), or install the [GitHub App](/docs/github-app) for private repos, Dig scans, and automatic pull request reviews.
 
 ## Set up with your agent
 
-The quickest way in. Paste this into Claude Code, Cursor, Codex or any other agent (or press **Set up with your agent** on the home page to copy it):
+Paste this into Claude Code, Cursor, Codex or any other agent (or press **Set up with your agent** on the home page):
 
 ```text
 Set up RedNest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.rednest.tech).
@@ -17,32 +17,27 @@ Read https://www.rednest.tech/docs/agents.md and follow it. Connect to its MCP s
 Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection and installing the GitHub App. Do not assume payment or free credits are available.
 ```
 
-Your agent connects, sets everything up, and can start scans and fix what it finds in your checkout. You step in where a person has to: approving the connection in your browser and choosing repositories on GitHub. Billing and token access are being revised. Once connected, it can do anything the dashboard does: see [Use it from your agent](/docs/agents).
+Your agent connects and can start scans once you approve it and install the App where needed. Hosted access uses one lifetime free scan per GitHub account; $RED holder scanning is not active yet. See [Use it from your agent](/docs/agents).
 
 ## Or set it up yourself
 
-1. **Sign in with GitHub.** Go to [Get started](/get-started) and press **Continue with GitHub**. RedNest uses your GitHub sign-in to see which repositories you can access.
-2. **Install the GitHub App.** From [Repos](/dashboard/repos), choose **Add repositories**, pick the account (yours or an organization) and the repositories RedNest may read. You come back to RedNest when GitHub is done.
-3. **Billing for that account.** Hosted access may change; the current product still includes a credits module documented under [Pricing & credits](/docs/pricing). The GitHub account you installed on is the customer. Only an admin of the organization (or the owner of a personal account) can manage billing.
-4. **Recon maps each repository.** Once the account is ready to scan, RedNest builds a threat model of every repository: its entry points, trust boundaries, sensitive data and dangerous code. It takes about a minute per repository.
-5. **Start scanning.** Open a repository from [Repos](/dashboard/repos) and press **Deep scan** to scan all of it, and open a pull request to see a review. The [Overview](/dashboard) adds up reviews, findings and fixes across every repository, and [Scans](/dashboard/scans) lists every run. Findings appear on the [scan's live feed](/docs/scans#deep-scans) as soon as they survive verification.
+1. **Sign in with GitHub.** Go to [Get started](/get-started) and continue with GitHub.
+2. **Run a Quick Scan** (optional). On [Scans](/dashboard/scans), paste a public GitHub repository URL. No App install is required for public Quick Scans.
+3. **Install the GitHub App** for private repositories and continuous reviews. From [Repos](/dashboard/repos), choose **Add repositories**, pick the account and repos RedNest may read.
+4. **Accept organization sponsorship** (for automatic PR reviews on an org). An admin accepts sponsorship in [Settings](/dashboard/settings).
+5. **Connect a Solana wallet** (optional, ahead of $RED launch). In [Settings](/dashboard/settings#wallet), connect and sign a verification message. Holder scanning stays disabled until the official launch.
 
-From then on pull requests are reviewed automatically (except drafts, some pull requests from forks, and any while the account has no plan or credits; see [PR reviews](/docs/scans#pr-reviews)), and pushes to your default branch check whether open findings have been fixed.
+## First scan
 
-## Where findings show up
-
-- **On the pull request.** A Check called **RedNest** reports what the review found. On private repositories each finding is also posted as a review comment on the vulnerable line. On public repositories, where Checks and comments are visible to everyone, RedNest only posts a count with a link to view the details privately. See [PR reviews](/docs/scans#pr-reviews).
-- **In the dashboard.** [Findings](/dashboard/findings) lists everything across your repositories. Each finding has the full attack path, a proof of concept and a fix prompt.
-- **By email.** People who have signed in and can push to the repository get an email about new critical findings and finished deep scans. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
-
-## Who can see what
-
-RedNest follows GitHub. You can see a repository's findings, and deep scan it, if GitHub says you have push access or higher. Billing belongs to the GitHub account: organization admins, or the owner of a personal account, can change the plan. There are no separate RedNest invites or roles.
+- **Free:** one lifetime chargeable scan per authenticated GitHub account ([Pricing](/docs/pricing)).
+- **After $RED launch (planned):** verified wallets holding at least 50,000 $RED get up to 50 scans per UTC month.
+- Findings appear in the [dashboard](/dashboard/findings) and, for installed private repos, on pull request Checks and comments.
 
 ## Next steps
 
-- [Use it from your agent](/docs/agents): set up, pay, scan and fix from Claude Code, Cursor or Codex, over MCP or HTTP.
-- [How scans work](/docs/scans): what each scan does, and when it runs.
-- [Findings & severity](/docs/findings): how findings are rated and what to do with them.
-- [Fixing with your agent](/docs/fixing): hand a finding to Cursor, Claude Code or Codex.
-- [Self-hosting](/docs/self-hosting): run RedNest on your own infrastructure.
+- [Quick Scan](/docs/quick-scan)
+- [GitHub App](/docs/github-app)
+- [Solana wallet verification](/docs/wallet)
+- [Pricing & $RED access](/docs/pricing)
+- [How scans work](/docs/scans)
+- [Use it from your agent](/docs/agents)

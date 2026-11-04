@@ -1,103 +1,60 @@
 ---
-title: Pricing & credits
-description: How scan credits work in the current billing module (subject to change for hosted RedNest access).
+title: Pricing & $RED access
+description: One lifetime free scan per GitHub account, then planned $RED holder access of 50 scans per UTC month. No recurring fiat subscription for holder scans.
 ---
 
-> Hosted RedNest access may move to a token-based model. The tables below describe the **existing credits module** still in the product; they are not a promise of public free scans or a live token gate.
+RedNest access is based on GitHub identity and, after launch, verified $RED holdings. There is no monthly or annual SaaS subscription required for the public $RED holder model.
 
-RedNest’s current billing module uses one plan at $1 a month, and credits at $1 each, less when you buy more at once. Paid scans draw from the account's credits, and most pull request reviews cost 1. There are no per-seat prices and no repository limits: credits are the only limit in this module.
+> **Token-holder scanning is not active yet.** Wallet verification is available ahead of the official $RED launch. No official mint is configured, and RedNest does not sell $RED.
 
-## Plans
+## Start scanning for free
 
-| Plan | Per month | Credits | Per credit |
-| --- | --- | --- | --- |
-| Standard | $1 | Bought as you need them | $1, down to $0.80 in bulk |
+**Allowance:** 1 lifetime scan per authenticated GitHub account.
 
-- Credits are bought ahead and never expire. Buy them when you join, from **Settings → Billing** at any time, or let auto top-up buy them when you run low.
-- The customer is the GitHub account RedNest is installed on, not a person. Everyone with access to that account's repositories shares its credits.
-- Prices are in US dollars. Stripe may show the amount in your local currency at checkout.
-- Accounts on an earlier plan (Lockbox, Chest or Vault) keep it, and its monthly credits, until they switch.
+- Sign in with GitHub.
+- Run one eligible security scan (for example a public [Quick Scan](/docs/quick-scan)).
+- No $RED token required.
+- No recurring subscription.
 
-## What scans cost
+[Start Free Scan](/dashboard/scans)
 
-| Scan | When it runs | Credits |
-| --- | --- | --- |
-| Recon | When a repository is added | Free |
-| PR review | A pull request is opened or updated | 1 to 3, by size |
-| Deep scan | When you press **Deep scan** | 5, 10 or 25, by repository size |
-| Fix check | Pushes to the default branch | Free |
+## Security scanning powered by $RED
 
-Recon and fix checks are free, but they still need the account to be on a plan with at least one credit left. With no credits, nothing runs at all, free scans included, until the account buys more; recon that was skipped then starts on its own.
+**Allowance:** 50 scans per UTC month after activation.  
+**Eligibility:** Hold at least **50,000 $RED** in a cryptographically verified Solana wallet.
 
-### PR reviews
+- Connect a Solana wallet in [Settings](/dashboard/settings#wallet).
+- Verify ownership by signing a server-issued challenge (no token transfer).
+- Maintain the required balance when requesting holder scans; eligibility is checked server-side.
+- Receive up to 50 chargeable scans per UTC month; the allowance resets at the UTC month boundary.
+- No recurring fiat subscription is required for holder access.
 
-A review costs credits by the number of security-relevant lines the pull request changes: lines added plus lines removed, not counting lockfiles, generated or vendored code, docs, tests and assets. Most pull requests are 1 credit.
+[Connect Wallet](/dashboard/settings#wallet)
 
-| Changed lines | Credits |
-| --- | --- |
-| Up to 500 | 1 |
-| Up to 2,000 | 2 |
-| Over 2,000 | 3 |
+Token-holder scanning is not active yet. Wallet verification is available ahead of the official $RED launch.
 
-Above 5,000 changed lines the review covers the most security-relevant files first (those with the most entry points and dangerous code) up to 5,000 lines. A pull request that only touches docs, tests, lockfiles or generated files costs nothing.
+## What uses a scan allowance
 
-### Deep scans
+One authorized scan allowance is charged for each of:
 
-Your account's first deep scan is free, whatever the repository's size: the **Deep scan** button says "Free: your first deep scan". If that scan fails, the next one is free instead. Like recon, it needs at least one credit left.
+- [Quick Scan](/docs/quick-scan)
+- Manual Dig / deep scan from the dashboard
+- Agent or MCP deep scan
+- Automatic pull request security review
 
-After that, a deep scan costs credits by the repository's size in lines of code, not counting vendored or generated code. Recon measures it, and from then on the **Deep scan** button shows the price and asks you to confirm it before the scan starts. You can scan a repository again as soon as its last deep scan has finished; each one costs its price again. Before recon has measured a repository (about a minute after you install or join), you confirm "Scan for up to 25 credits": it holds 25, and charges the tier the scan measures. With fewer than 25 credits, the button waits for recon to size the repository and says so.
+Accounting follows RedNest’s reservation and settlement rules: an allowance is reserved when a chargeable scan is authorized, then settled when the scan meaningfully starts. A scan that fails, is refused, or never starts does **not** permanently consume that allowance in the usual settlement path. Recon (threat-model mapping) and fix checks are not charged as holder scan allowances.
 
-| Repository size | Credits |
-| --- | --- |
-| Under 100,000 lines | 5 |
-| Under 300,000 lines | 10 |
-| Under 1,000,000 lines | 25 |
-| 1,000,000 lines or more | Not scanned. Get in touch. |
+Organizations can designate a **sponsor** whose allowance funds automatic pull request reviews. Scan allowances are not unlimited: free users get one lifetime scan, and eligible holders get at most 50 chargeable scans per UTC month after activation.
 
-Repositories of a million lines or more aren't scanned at all, by recon, reviews or deep scans.
+## How holder eligibility works
 
-## How credits are charged
+1. GitHub remains your RedNest identity.
+2. You verify a Solana wallet with a signed message ([Solana wallet verification](/docs/wallet)).
+3. When holder scanning is activated, RedNest checks the verified wallet’s on-chain $RED balance against the 50,000 whole-token threshold before reserving a holder scan.
+4. Client-reported balances are never trusted.
 
-- When a paid scan starts, its credits are held. When it finishes, it is charged what it cost, and never more than the price you were shown.
-- If a scan fails, is refused or never starts, nothing is charged and the held credits go back to your balance.
-- A pull request that arrives when the account is out of credits isn't reviewed. Its Check is **neutral** ("Out of credits"), so it never blocks a merge, and it links to where you can top up. The same happens, with "Not reviewed: no plan", before the account has a plan.
-- When there aren't enough credits for a deep scan, the repository shows how many it needs, with a link to top up, instead of the **Deep scan** button.
-- With auto top-up off, the account's admins get an email when credits run low (below 5) and when they run out. With it on, they get an email for each top-up, and one if a top-up fails.
-
-## Free credits
-
-Testers can claim 20 free credits from [rednest.tech/claim](/claim), or by typing a tester's code into **Have a code?** at checkout, with no card. This describes the existing credits module; hosted access and public free-scan offers may change. They work like bought credits: reviews, deep scans and the free first deep scan all draw on them.
-
-- One claim per GitHub account, and one per person, for an account that has never had a plan. Only an admin of the account can claim.
-- The account is on **Free credits** until it joins Standard. Nothing can be charged on it: there are no top-ups or auto top-up.
-- When the credits are spent, every scan stops (pull requests get the neutral "Out of credits" Check) until the account joins Standard from **Settings → Billing**, which takes a card on Stripe. Any free credits left over carry across.
-
-## Buying credits
-
-Credits are $1 each and never expire. Buy 10, 25, 50 or 100 when you join, and up to 1,000 at once from **Settings → Billing** after that. Buying more at once costs less per credit: 25 or more are $0.90 each, 50 or more $0.85, and 100 or more $0.80. The whole purchase is priced at the rate its size reaches, and auto top-ups get the same discount.
-
-| Credits bought at once | Per credit | For example |
-| --- | --- | --- |
-| 1 to 24 | $1.00 | 10 for $10 |
-| 25 to 49 | $0.90 | 25 for $22.50, saving $2.50 |
-| 50 to 99 | $0.85 | 50 for $42.50, saving $7.50 |
-| 100 or more | $0.80 | 100 for $80, saving $20 |
-
-### Auto top-up
-
-Auto top-up buys credits for you when fewer than 5 are left, so pull requests keep getting reviewed. You choose how many it buys each time (the same amount you started with, unless you change it) and the most it may spend in a month: $50, or five top-ups if that is more, unless you change it. It's on when you join unless you untick it, and you can change or turn it off in Settings. Auto top-up charges your card directly, without a confirm page.
-
-## Managing billing
-
-Everything lives in [Settings](/dashboard/settings), under Billing. Only an admin of the GitHub organization, or the owner of a personal account, can change it.
-
-- **Switching from an earlier plan.** Accounts on Lockbox, Chest or Vault can switch to Standard from Settings. Credits already bought stay.
-- **Confirm before charging.** When a card is already on file, every credit purchase and plan change is shown on a confirm page, with the exact amount, before it is made. Auto top-up is the exception: it charges on its own, within your monthly limit.
-- **Business invoices.** When you join, you can add your business's name, billing address and tax ID (a VAT number, EIN, ABN or the like, by country). Stripe keeps them and puts them on every invoice; RedNest doesn't store them.
-- **Card, invoices and cancelling** are handled in Stripe's customer portal, linked from Settings. A cancelled plan keeps working until the end of the period you paid for.
-
-Payments are processed by Stripe, through the billing service Autumn. RedNest never sees your card number.
+Until activation, missing mint configuration or a disabled launch flag keeps holder access fail-closed. Your free lifetime scan and GitHub sign-in continue to work.
 
 ## Self-hosted
 
-A self-hosted RedNest has billing turned off: no plan, no credits and nothing to buy. You pay only for your own servers and model usage. The operational limits still apply: one deep scan at a time per repository, no scans of repositories with a million lines or more, and at most two scans at a time per account, with two more for recon. See [Self-hosting](/docs/self-hosting#limits-without-billing).
+A self-hosted RedNest has hosted billing and $RED holder gates turned off. You pay only for your own servers and model usage. See [Self-hosting](/docs/self-hosting).

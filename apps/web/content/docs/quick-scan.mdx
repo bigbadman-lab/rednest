@@ -1,0 +1,35 @@
+---
+title: Quick Scan
+description: Scan a public GitHub repository by URL without installing the RedNest GitHub App.
+---
+
+Quick Scan lets you paste a **public** GitHub repository URL and run a deep security scan without installing the RedNest GitHub App.
+
+## How to run one
+
+1. [Sign in with GitHub](/get-started).
+2. Open [Scans](/dashboard/scans).
+3. Paste a public repository URL (for example `https://github.com/owner/repo`).
+4. Submit **Quick Scan**.
+
+[Start Free Scan](/dashboard/scans)
+
+## What you need
+
+- An authenticated GitHub account.
+- A **public** repository. Private repos require the [GitHub App](/docs/github-app).
+- An available scan allowance (your lifetime free scan, or a holder allowance after $RED activation).
+
+Repositories that are missing, private, or larger than RedNest’s size limit are refused without consuming an allowance in the usual failure path.
+
+## Results
+
+- Progress and findings appear on the scan’s page in the dashboard.
+- Quick Scan does **not** publish GitHub Checks or pull request review comments.
+- Only you (the requester) can see that Quick Scan’s results under the usual dashboard access rules.
+
+## Related
+
+- [Pricing & $RED access](/docs/pricing) — free scan and planned holder allowances
+- [GitHub App](/docs/github-app) — private repos and automatic PR reviews
+- [How scans work](/docs/scans)

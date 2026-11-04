@@ -13,7 +13,7 @@ export const site = {
   name: "RedNest",
   title: "RedNest — Autonomous AI code security scanning",
   description:
-    "RedNest is an autonomous AI-powered code security platform: connect GitHub, scan repositories, and get actionable vulnerability findings with attack paths and fix guidance.",
+    "AI-powered security scanning for GitHub repositories. One free lifetime scan, then planned $RED holder access—no recurring fiat subscription for holder scans.",
   url: siteUrl() ?? "http://localhost:3000",
   githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/bigbadman-lab/rednest",
   /** Official X (Twitter) account. */
@@ -27,7 +27,12 @@ export const site = {
     getStarted: "/get-started",
     signIn: "/sign-in",
     dashboard: "/dashboard",
+    dashboardScans: "/dashboard/scans",
+    settings: "/dashboard/settings",
     docs: "/docs",
+    quickScan: "/docs/quick-scan",
+    githubApp: "/docs/github-app",
+    wallet: "/docs/wallet",
     scans: "/docs/scans",
     findings: "/docs/findings",
     pricing: "/docs/pricing",

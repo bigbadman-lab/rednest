@@ -2,9 +2,12 @@
   "title": "RedNest docs",
   "pages": [
     "index",
-    "agents",
+    "quick-scan",
+    "github-app",
+    "wallet",
     "pricing",
     "scans",
+    "agents",
     "findings",
     "fixing",
     "self-hosting",

@@ -69,6 +69,17 @@ export function SettingsView({
             <p className="account-role">{org.admin ? "You’re an admin" : "Only admins can change these"}</p>
           </div>
           <div className="settings-form">
+            <div>
+              <p className="field-legend">Scan access</p>
+              <p className="field-help">
+                Hosted RedNest uses one lifetime free scan per GitHub account, then planned $RED holder access (50 scans per
+                UTC month when activated).{" "}
+                <Link className="quiet" href="/docs/pricing">
+                  Pricing &amp; $RED access
+                </Link>
+                . Connect a wallet below when you are ready; holder scanning is not active yet.
+              </p>
+            </div>
             {billing && <BillingPanel org={org} billing={billing[index] ?? null} />}
             {org.sponsored ? (
               <div>

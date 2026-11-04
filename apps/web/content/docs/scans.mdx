@@ -1,32 +1,27 @@
 ---
 title: How scans work
-description: Recon, PR reviews, deep scans and fix checks, and what each one does with your code.
+description: Recon, PR reviews, deep scans, Quick Scan and fix checks, and what each one does with your code.
 ---
 
-RedNest runs four kinds of scan. All of them read your code in a temporary workspace that is deleted when the scan ends. None of them run your application, its tests or the proofs of concept they write.
+RedNest runs several kinds of scan. All of them read your code in a temporary workspace that is deleted when the scan ends. None of them run your application, its tests or the proofs of concept they write.
 
-| Scan | Runs when | What it does | Cost |
+| Scan | Runs when | What it does | Allowance |
 | --- | --- | --- | --- |
-| Recon | A repository is added | Builds the repository's threat model | Free |
-| PR review | A pull request is opened or updated | Reviews the change for vulnerabilities | 1 to 3 credits, usually 1 |
-| Deep scan | You press **Deep scan** | Hunts across the whole repository | 5, 10 or 25 credits |
-| Fix check | You push to the default branch | Re-checks open findings whose cited files the push changed | Free |
+| Recon | A repository is ready after App install / sponsorship | Builds the repository's threat model | Not charged as a holder/free scan allowance |
+| PR review | A pull request is opened or updated | Reviews the change for vulnerabilities | One chargeable scan allowance |
+| Deep scan / Dig | You press **Deep scan**, or an agent starts one | Hunts across the whole repository | One chargeable scan allowance |
+| Quick Scan | You paste a public GitHub URL | Deep scan without App install | One chargeable scan allowance |
+| Fix check | You push to the default branch | Re-checks open findings whose cited files the push changed | Not charged as a holder/free scan allowance |
 
-An account runs at most two scans at a time, and recon has two slots of its own, so a deep scan or a review never waits behind it. Others wait in a queue: each checks for a free slot every 10 seconds, says on its page that it is waiting, and gives up as failed after waiting two hours.
+Chargeable scans use your lifetime free scan first, then (after $RED holder activation) monthly holder allowances. See [Pricing & $RED access](/docs/pricing). Accounting reserves an allowance when the scan is authorized and settles it when the scan meaningfully starts; failed or refused starts do not permanently consume that allowance in the usual path.
 
-Repositories of a million lines of code or more aren't scanned, by any kind of scan. Get in touch if you need one scanned.
+An account runs at most two scans at a time, and recon has two slots of its own. Repositories of a million lines of code or more aren't scanned.
 
 ## Recon
 
-Recon runs when RedNest is installed on a repository, or a repository is added to the installation, once the account has a plan. It maps the repository the way an attacker would before trying anything:
+Recon maps the repository the way an attacker would before trying anything: entry points, trust boundaries, sensitive data, dangerous code and existing protections. The result is the repository's **threat model**. Every later scan of that repository starts from it.
 
-- entry points: routes, handlers, command-line tools, jobs, queues and webhooks
-- trust boundaries, and how authentication and authorization work
-- sensitive data and where it is stored
-- dangerous code: SQL, shell commands, file access, deserialization, outbound requests, templates and crypto
-- protections the framework already gives you
-
-The result is the repository's **threat model**: a structured summary, not a copy of your code. Every later scan of that repository starts from it. If a repository has no threat model yet, the next push to its default branch, pull request or deep scan builds one.
+On organizations, recon and automatic reviews typically need an accepted [scan sponsor](/docs/github-app#organization-sponsorship).
 
 ## PR reviews
 
@@ -34,13 +29,13 @@ A pull request is reviewed when it is opened, gets new commits, is reopened, or 
 
 - drafts, until they are marked ready for review
 - pull requests from forks of public repositories, and from outside contributors' forks of private ones (see [below](#pull-requests-from-forks))
-- pull requests on an account with no plan, or out of credits: these get a neutral Check instead
+- pull requests when no scan allowance is available: these get a neutral Check instead
 
 1. RedNest posts a **RedNest** Check straight away, showing "Scanning…".
 2. It reviews the change in the context of the threat model. A finding has to touch the lines the pull request changed: issues that were already there are left for deep scans.
 3. It completes the Check, and on private repositories posts the findings as review comments.
 
-Each commit is reviewed once. Reviews are priced by the number of security-relevant changed lines; see [Pricing & credits](/docs/pricing#pr-reviews).
+Each commit is reviewed once. One chargeable scan allowance covers the review.
 
 ### The Check
 
@@ -48,57 +43,47 @@ Each commit is reviewed once. Reviews are priced by the number of security-relev
 | --- | --- |
 | Failure | A finding is at or above your threshold (High, unless you change it) |
 | Success | Nothing at or above the threshold |
-| Neutral | Not reviewed: no plan, out of credits, or the review couldn't finish |
+| Neutral | Not reviewed: no allowance, or the review couldn't finish |
 
 Set the threshold in [Settings](/dashboard/settings): Critical, High, Medium or Any. Low-confidence findings never fail a Check. A Check only blocks merging if you make it a required status check in GitHub's branch protection. A neutral Check never blocks.
 
 ### Private repositories
 
-Each finding is posted as a review comment on the last step of its attack path that is inside the diff, with its severity, what the attacker gets, who can exploit it, the attack path, a proof of concept, the fix, and a collapsed fix prompt for your coding agent. A finding whose lines are outside the diff goes in the review's summary instead. The Check lists every finding and what the review cost, for example "Reviewed · 2 credits".
+Each finding is posted as a review comment on the last step of its attack path that is inside the diff.
 
 ### Public repositories
 
-On a public repository, Checks and review comments are visible to everyone. So RedNest posts no review comments and no details: only the Check, with counts by severity and a link to the dashboard.
-
-> RedNest found 1 high-severity issue. View privately →
-
-The details are only in the dashboard, for people with push access.
+On public repositories, RedNest posts no review comments and no details: only the Check, with counts by severity and a link to the dashboard.
 
 ### Pull requests from forks
 
 - On **public** repositories, pull requests from forks are never reviewed automatically. A maintainer with write access comments `/sandchest review` on the pull request to start one.
 - On **private** repositories, pull requests from forks are reviewed automatically when the author is an owner, member or collaborator. For anyone else, a maintainer comments `/sandchest review`.
 
-The command has to be on a line of its own. Comments from people without write access, and from bots, are ignored.
+The command has to be on a line of its own. Comments from people without write access, and from bots, are ignored. (The slash command text still uses the upstream `sandchest` token in the product today.)
 
 RedNest never opens GitHub issues.
 
-## Deep scans
+## Deep scans and Dig
 
-A deep scan hunts across the whole repository. It only runs when someone presses **Deep scan** on the repository's page (open it from [Repos](/dashboard/repos)), or **Scan again** on a finished deep scan. Anyone who can push to the repository can start one. The button shows the cost, and a second press confirms it.
+A deep scan hunts across the whole repository. It runs when someone presses **Deep scan** on the repository's page, **Scan again** on a finished deep scan, or when an agent starts one. Anyone who can push to the repository can start one (subject to allowance).
 
-- One deep scan runs at a time per repository. Once it finishes you can start another whenever you like: each one costs credits, shown on the button before you confirm.
-- The scan's page shows a live feed of what RedNest is doing, and findings appear as they survive verification.
-- When it finishes, people with access get an email with what it found, unless an admin has turned emails off.
+- One deep scan runs at a time per repository.
+- The scan's page shows a live feed, and findings appear as they survive verification.
+
+## Quick Scan
+
+Public repository URLs can be scanned from [Scans](/dashboard/scans) without installing the App. See [Quick Scan](/docs/quick-scan).
 
 ## Fix checks
 
-When you push to the default branch, RedNest checks the repository's open findings whose cited files that push changed. Other open findings aren't touched. Each one is checked again on the new code:
-
-- Each step of the attack path is found again by its code, so findings follow code that moved.
-- If the attack path is gone, the finding is marked **fixed**, and its code excerpts are deleted.
-- If the cited code can no longer be found, the finding stays open and is marked **Code moved**. The mark clears when a later scan finds the same finding again. RedNest never closes a finding just because it lost track of the code.
-
-Fix checks are free, while the account has at least one credit left.
+When you push to the default branch, RedNest checks open findings whose cited files that push changed. If the attack path is gone, the finding is marked **fixed**. Fix checks are not charged as free or holder scan allowances.
 
 ## How RedNest finds vulnerabilities
 
 PR reviews and deep scans run the same pipeline:
 
-1. **Signal sweep.** A fast, deterministic pass finds leaked secrets, vulnerable dependencies that your code actually calls, and dangerous code reachable from an entry point. These are leads, not findings.
-2. **Hunt.** Several attacker agents work in parallel from the threat model and the leads. They think like outsiders, free-tier users, fraudsters and insiders, and trace untrusted input from entry points to dangerous code, chaining weaknesses together.
-3. **Evidence gate.** A candidate is kept only if it names the exact entry point, cites every step from input to impact by file and line (each citation is checked against your code), states who can exploit it, and includes a proof of concept and its impact in plain English.
-4. **Skeptic.** A separate reviewer reads the cited code and tries to disprove each finding: middleware, validation, framework defaults, unreachable code. It can only drop a finding by citing the code that disproves it. Each survivor gets a confidence: high, medium or low.
-5. **Write-up.** The finding is written up with a title, severity, fix guidance and a fix prompt. Code excerpts are read from your repository, never written by the model.
-
-Repository content is treated as untrusted data. The model is told to ignore any text in code, comments or pull requests that tries to instruct it, and to report it as a prompt injection finding. That makes manipulation harder, but it isn't a guarantee.
+1. **Signal sweep.** A fast pass finds leaked secrets, vulnerable dependencies your code calls, and dangerous code reachable from an entry point. These are leads, not findings.
+2. **Hunt.** Several attacker agents work in parallel from the threat model and the leads.
+3. **Evidence gate.** A candidate is kept only if it names the entry point, cites every step by file and line, states who can exploit it, and includes a proof of concept.
+4. **Skeptic.** Another pass tries to disprove the finding from the code before it is reported.

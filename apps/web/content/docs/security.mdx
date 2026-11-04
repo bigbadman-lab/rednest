@@ -28,12 +28,14 @@ RedNest adds no account, repository, organization or user identifiers to prompts
 | --- | --- |
 | Findings, with short code excerpts for each step of the attack path | To show you the vulnerability and build its fix prompt |
 | Each repository's threat model: a structured summary of entry points, trust boundaries and risky code | So every scan starts from what is already known |
-| Scan records: status, timings, counts, credits, and the live feed's progress messages | To show scan history and charge correctly |
+| Scan records: status, timings, counts, and the live feed's progress messages | To show scan history and settle scan allowances |
 | Your account: GitHub user ID, username, display name, email address and avatar | To sign you in and send notifications |
 | Each sign-in session, with your browser's user agent | To keep you signed in |
 | Your GitHub sign-in token, encrypted | To check which repositories you can access |
 | API keys and agents' OAuth tokens, as SHA-256 hashes only, with each one's name and when it was last used | To let your agents act as you, and show them in Settings |
-| Billing state: plan, credits and auto top-up settings | To run your plan |
+| Verified Solana wallet bindings (public key and verification timestamps) | To support planned $RED holder eligibility |
+| Entitlement usage (free scan and monthly holder quotas) | To enforce scan allowances |
+| Legacy billing state, when that module is enabled for an account | Historical credits/plan data for accounts that still use it |
 
 Your email address is the primary one on your GitHub account, even if it is private on GitHub, because the App may read email addresses. A no-reply placeholder is used only when GitHub returns no address at all.
 
@@ -53,8 +55,8 @@ The findings themselves stay, without code, so your history survives. Uninstalli
 
 - A person can see a repository's findings only if GitHub says they have push access or higher to it. RedNest checks with GitHub using their own sign-in, and re-checks at least every five minutes.
 - On public repositories, nothing about a finding is posted to GitHub beyond a count by severity, because Checks and comments there are public. See [PR reviews](/docs/scans#public-repositories).
-- Billing and settings can only be changed by admins of the GitHub organization, or the owner of a personal account.
-- Agents act as the person who connected them, with the same access, re-checked with GitHub the same way. Connecting always needs that person's approval in their browser, signed in with GitHub: an MCP client's OAuth consent (with PKCE), or a device code they confirm. A first card payment is always made by the person on Stripe; agents never see card details. Revoke any agent in **Settings → Agents**. See [Use it from your agent](/docs/agents).
+- Organization sponsorship and App settings can only be changed by admins of the GitHub organization, or the owner of a personal account. Wallet verification is done by the signed-in person in Settings.
+- Agents act as the person who connected them, with the same access, re-checked with GitHub the same way. Connecting always needs that person's approval in their browser, signed in with GitHub: an MCP client's OAuth consent (with PKCE), or a device code they confirm. Revoke any agent in **Settings → Agents**. See [Use it from your agent](/docs/agents).
 
 ## GitHub App permissions
 
@@ -76,9 +78,9 @@ RedNest never writes to your code and never opens issues.
 
 - **Analytics are first-party.** Usage events (page views with IDs removed from the address, time on page, clicks, sign-up steps and actions) go to RedNest's own database. A random ID in a cookie ties them to a browser, and to an account after sign-in. They record opaque IDs, counts and categories, never code, finding contents, repository names, names, email addresses or IP addresses. The hosting provider's cookieless web analytics count page views and measure page speed. There are no advertising or tracking scripts.
 - **Finding emails** cover new critical findings and finished deep scans. They go to people who have signed in and had push access to the repository when RedNest last checked, within the past 30 days. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
-- **Billing emails** go to the account's admins and can't be turned off: credits running low or out (only while auto top-up is off), an auto top-up that went through or failed, and a scan stopped because the model provider refused it. Admins are people GitHub confirmed as admins in the last 30 days; if there are none, RedNest asks GitHub before sending. The scan-stopped email names the repository, so it follows the account's email setting and only goes to admins confirmed in the last 30 days.
+- **Operational emails** go to account admins when a scan stops because the model provider refused it, and (when the legacy credits module is enabled) when credits run low or an auto top-up fails. Admins are people GitHub confirmed as admins in the last 30 days; if there are none, RedNest asks GitHub before sending.
 - There is no marketing email.
-- **Payments** are processed by Stripe, through the billing service Autumn. RedNest never sees your card number.
+- **Public hosted access** does not require a fiat subscription for the free scan or planned $RED holder model. Legacy card billing, when enabled for an account, is processed by Stripe through Autumn; RedNest never sees card numbers.
 
 The list of subprocessors that handle data for the hosted service is available on request from the contact address in the [Privacy policy](/privacy#contact).
 

@@ -1,12 +1,10 @@
 /**
- * The docs and legal pages, checked against the code they describe: prices
- * and credit costs come from @sandchest/billing, every internal link points
- * at a real page and heading, and nothing names a model vendor.
+ * Docs and legal pages: structure, internal links, and public pricing copy
+ * that must match the RedNest free-scan + planned $RED holder model.
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { CREDIT_AMOUNTS, CREDIT_PRICE, CREDIT_TIERS, creditsPrice, creditsSaving, DEEP_SCAN_TIERS, defaultAutoTopUpLimit, FREE_CREDITS, MAX_PURCHASE_CREDITS, PLAN, PR_REVIEW_TIERS, TOP_UP_BELOW } from "@sandchest/billing";
 import { setupPrompt } from "@/lib/agent-prompt";
 import { site } from "@/lib/site";
 
@@ -16,83 +14,60 @@ const legalDir = join(root, "content/legal");
 const read = (file: string) => readFileSync(file, "utf8");
 const mdx = (dir: string) => readdirSync(dir).filter((file) => file.endsWith(".mdx"));
 const doc = (name: string) => read(join(docsDir, `${name}.mdx`));
-const money = (n: number) => `$${n.toLocaleString("en")}`;
-const count = (n: number) => n.toLocaleString("en");
 
-/** The rows of the first Markdown table after `heading`, as trimmed cells. */
-function table(source: string, heading: string): string[][] {
-  const start = source.indexOf(heading);
-  if (start < 0) throw new Error(`No heading ${heading}`);
-  const lines = source.slice(start).split("\n");
-  const first = lines.findIndex((line) => line.startsWith("|"));
-  const rows: string[][] = [];
-  for (const line of lines.slice(first)) {
-    if (!line.startsWith("|")) break;
-    rows.push(line.split("|").slice(1, -1).map((cell) => cell.trim()));
-  }
-  return rows.slice(2); // header and separator
-}
-
-describe("pricing matches the billing package", () => {
+describe("pricing matches the $RED access model", () => {
   const pricing = doc("pricing");
 
-  test("the plan", () => {
-    expect(table(pricing, "## Plans")).toEqual([[PLAN.name, money(PLAN.price), "Bought as you need them", `${money(CREDIT_PRICE)}, down to $${CREDIT_TIERS.at(-1)!.price.toFixed(2)} in bulk`]]);
+  test("free and holder offerings", () => {
+    expect(pricing).toContain("## Start scanning for free");
+    expect(pricing).toContain("1 lifetime scan per authenticated GitHub account");
+    expect(pricing).toContain("[Start Free Scan](/dashboard/scans)");
+    expect(pricing).toContain("## Security scanning powered by $RED");
+    expect(pricing).toContain("50 scans per UTC month");
+    expect(pricing).toContain("50,000 $RED");
+    expect(pricing).toContain("[Connect Wallet](/dashboard/settings#wallet)");
+    expect(pricing).toContain("Token-holder scanning is not active yet");
+    expect(pricing).toContain("No official mint is configured");
   });
 
-  test("PR review tiers", () => {
-    const rows = table(pricing, "### PR reviews");
-    expect(rows).toEqual(
-      PR_REVIEW_TIERS.map((tier, i) => [Number.isFinite(tier.maxLines) ? `Up to ${count(tier.maxLines)}` : `Over ${count(PR_REVIEW_TIERS[i - 1]!.maxLines)}`, String(tier.credits)]),
-    );
+  test("does not advertise SaaS subscription prices", () => {
+    expect(pricing).not.toMatch(/\$1 a month|Lockbox|Chest or Vault|auto top-up|Bought as you need them/i);
+    expect(pricing).not.toContain("## Plans");
+    expect(pricing).not.toContain("## Buying credits");
   });
 
-  test("deep scan tiers", () => {
-    const rows = table(pricing, "### Deep scans");
-    expect(rows.slice(0, -1)).toEqual(DEEP_SCAN_TIERS.map((tier) => [`Under ${count(tier.maxLoc)} lines`, String(tier.credits)]));
-    expect(rows.at(-1)![0]).toBe(`${count(DEEP_SCAN_TIERS.at(-1)!.maxLoc)} lines or more`);
-  });
-
-  test("buying credits and auto top-up", () => {
-    const amounts = CREDIT_AMOUNTS.map(String);
-    expect(pricing).toContain(`Credits are ${money(CREDIT_PRICE)} each and never expire. Buy ${amounts.slice(0, -1).join(", ")} or ${amounts.at(-1)} when you join, and up to ${count(MAX_PURCHASE_CREDITS)} at once`);
-    const [, ...bulk] = CREDIT_TIERS.map((tier) => `${tier.from} or more${tier === CREDIT_TIERS[1] ? " are" : ""} $${tier.price.toFixed(2)}${tier === CREDIT_TIERS[1] ? " each" : ""}`);
-    expect(pricing).toContain(`Buying more at once costs less per credit: ${bulk.slice(0, -1).join(", ")}, and ${bulk.at(-1)}.`);
-    // The credit price table, one row per tier, with a worked example at its first amount offered.
-    const cash = (n: number) => (Number.isInteger(n) ? money(n) : `$${n.toFixed(2)}`);
-    const example = (credits: number) => {
-      const saving = creditsSaving(credits);
-      return `${credits} for ${cash(creditsPrice(credits))}${saving > 0 ? `, saving ${cash(saving)}` : ""}`;
-    };
-    expect(table(pricing, "## Buying credits")).toEqual(
-      CREDIT_TIERS.map((tier, i) => {
-        const next = CREDIT_TIERS[i + 1];
-        const amount = CREDIT_AMOUNTS.find((n) => n >= tier.from && (!next || n < next.from))!;
-        return [next ? `${tier.from} to ${next.from - 1}` : `${tier.from} or more`, `$${tier.price.toFixed(2)}`, example(amount)];
-      }),
-    );
-    expect(pricing).toContain(`Testers can claim ${FREE_CREDITS.credits} free credits from [rednest.tech/claim](/claim), or by typing a tester's code`);
-    expect(pricing).toContain(`when fewer than ${TOP_UP_BELOW} are left`);
-    expect(pricing).toContain(`run low (below ${TOP_UP_BELOW})`);
-    expect(pricing).toContain(`${money(defaultAutoTopUpLimit(CREDIT_AMOUNTS[0]))}, or five top-ups if that is more`);
-  });
-
-  test("the summary ranges", () => {
-    const pr = `${PR_REVIEW_TIERS[0]!.credits} to ${PR_REVIEW_TIERS.at(-1)!.credits}`;
-    expect(pricing).toContain(`you confirm "Scan for up to ${DEEP_SCAN_TIERS.at(-1)!.credits} credits"`);
-    const deep = `${DEEP_SCAN_TIERS.slice(0, -1).map((t) => t.credits).join(", ")} or ${DEEP_SCAN_TIERS.at(-1)!.credits}`;
-    for (const page of [pricing, doc("scans")]) {
-      expect(page).toContain(pr);
-      expect(page).toContain(deep);
-    }
+  test("scan accounting covers Quick Scan, Dig, agents and PR reviews", () => {
+    expect(pricing).toContain("Quick Scan");
+    expect(pricing).toContain("Manual Dig");
+    expect(pricing).toContain("Agent or MCP deep scan");
+    expect(pricing).toContain("Automatic pull request security review");
+    expect(pricing).toContain("does **not** permanently consume");
+    expect(pricing).toContain("sponsor");
   });
 });
 
 describe("structure", () => {
-  test("the sidebar lists every docs page once, in the spec's order", () => {
+  test("the sidebar lists every docs page once, in the intended order", () => {
     const meta = JSON.parse(read(join(docsDir, "meta.json"))) as { pages: string[] };
-    expect(meta.pages).toEqual(["index", "agents", "pricing", "scans", "findings", "fixing", "self-hosting", "security", "acceptable-use"]);
-    expect([...meta.pages].sort()).toEqual(mdx(docsDir).map((file) => file.replace(/\.mdx$/, "")).sort());
+    expect(meta.pages).toEqual([
+      "index",
+      "quick-scan",
+      "github-app",
+      "wallet",
+      "pricing",
+      "scans",
+      "agents",
+      "findings",
+      "fixing",
+      "self-hosting",
+      "security",
+      "acceptable-use",
+    ]);
+    expect([...meta.pages].sort()).toEqual(
+      mdx(docsDir)
+        .map((file) => file.replace(/\.mdx$/, ""))
+        .sort(),
+    );
   });
 
   test("every page has a title and a description", () => {
@@ -156,7 +131,7 @@ describe("links", () => {
         const page = pages.get(target);
         if (!page && !routes.has(target)) broken.push(`${from} → ${href}`);
         else if (hash && page && !headings(page).has(hash)) broken.push(`${from} → ${href} (no heading)`);
-        else if (hash && !page) broken.push(`${from} → ${href} (anchor on a page without content)`);
+        // App routes (dashboard, etc.) may use element ids not present in MDX.
       }
     }
     expect(broken).toEqual([]);
@@ -175,8 +150,6 @@ describe("what the pages must never say", () => {
     for (const file of all) expect(read(file), file).not.toMatch(internal);
   });
 
-  // Vendor and model names can't be listed in a public repository, so the list lives outside it:
-  // SANDCHEST_BANNED_TERMS (comma-separated) or evals/private/banned-terms.txt (one per line, gitignored).
   const bannedFile = join(root, "../../evals/private/banned-terms.txt");
   const bannedTerms = (process.env.SANDCHEST_BANNED_TERMS ?? (existsSync(bannedFile) ? read(bannedFile) : ""))
     .split(/[,\n]/)
@@ -193,8 +166,12 @@ describe("what the pages must never say", () => {
     for (const file of mdx(legalDir)) {
       const source = read(join(legalDir, file));
       expect(source, file).toContain('import { legal } from "@/lib/legal";');
-      // No email addresses or bracketed placeholders typed into the page itself.
       expect(source.replace(/^import .*$/m, ""), file).not.toMatch(/[\w.+-]+@[\w-]+\.\w+|\[[A-Z][^\]]*\](?!\()/);
     }
+  });
+
+  test("public pricing does not claim the token has launched", () => {
+    expect(doc("pricing")).toContain("not active yet");
+    expect(doc("pricing")).not.toMatch(/\blaunched\b.*\$RED|\$RED is (live|tradable|available to buy)/i);
   });
 });

@@ -17,7 +17,7 @@ import { site, siteUrl } from "@/lib/site";
 const base = "https://sandchest.example";
 const pages = [
   { url: "/docs", title: "Getting started", description: "Install it." },
-  { url: "/docs/pricing", title: "Pricing & credits", description: "What it costs." },
+  { url: "/docs/pricing", title: "Pricing & $RED access", description: "Free scan and planned $RED holder access." },
 ];
 
 describe("Markdown URLs", () => {
@@ -50,7 +50,7 @@ describe("page Markdown", () => {
   test("starts with the title and summary, and makes site links absolute", () => {
     const markdown = renderPageMarkdown(pages[1]!, `\n${body}\n`, base, false);
     expect(markdown).toBe(
-      `# Pricing & credits\n\n> What it costs.\n\nSee [pricing](${base}/docs/pricing#top-ups), [GitHub](https://github.com), [protocol-relative](//cdn.example) and [the policy](${base}/privacy#contact).\n`,
+      `# Pricing & $RED access\n\n> Free scan and planned $RED holder access.\n\nSee [pricing](${base}/docs/pricing#top-ups), [GitHub](https://github.com), [protocol-relative](//cdn.example) and [the policy](${base}/privacy#contact).\n`,
     );
   });
 
@@ -66,7 +66,7 @@ describe("llms.txt and llms-full.txt", () => {
     const links = [...index.matchAll(/^- \[([^\]]+)\]\(([^)]+)\)/gm)].map((m) => [m[1], m[2]]);
     expect(links.slice(0, 2)).toEqual([
       ["Getting started", `${base}/docs.md`],
-      ["Pricing & credits", `${base}/docs/pricing.md`],
+      ["Pricing & $RED access", `${base}/docs/pricing.md`],
     ]);
     expect(index).toContain(`${base}/llms-full.txt`);
     expect(index).toContain(`[Privacy policy](${base}/privacy)`);
@@ -96,7 +96,7 @@ describe("links without a known address", () => {
     const markdown = renderPageMarkdown(pages[1]!, "See [scans](/docs/scans#fix-checks) and [the policy](/privacy).", base, false);
     for (const output of [index, markdown]) expect(output).not.toContain("localhost");
     expect(index).toContain("- [Getting started](/docs.md)");
-    expect(index).toContain("- [Pricing & credits](/docs/pricing.md)");
+    expect(index).toContain("- [Pricing & $RED access](/docs/pricing.md)");
     expect(index).toContain("Every page in one file: /llms-full.txt");
     expect(index).toContain("[Privacy policy](/privacy)");
     expect(markdown).toContain("See [scans](/docs/scans#fix-checks) and [the policy](/privacy).");
