@@ -19,8 +19,8 @@ const result = (id: Message["id"], value: unknown) => ({ jsonrpc: "2.0", id, res
 const failure = (id: Message["id"], code: number, message: string) => ({ jsonrpc: "2.0", id: id ?? null, error: { code, message } });
 
 export const INSTRUCTIONS = `RedNest is a hacker for the person's team: it reviews their pull requests and deep scans their GitHub repositories for real, exploitable vulnerabilities, with evidence and a fix prompt for each.
-Start with get_me: it says who you act as and lists next_steps in order. Steps only a person can take come with a URL to hand them (for example installing the GitHub App). Calls that wait on the person (list_accounts, get_billing, and the device token) take wait=50 and return as soon as they're done. Follow next_steps for billing when present; do not assume free credits or card checkout are available. You can start deep scans, follow them (get_scan with wait), read findings and fix them with get_fix_prompt, dismiss or reopen findings, and change settings.
-Accounts are GitHub accounts (a person or an organization) and can be named by login; repositories by owner/name. Billing and settings changes need the person to be an admin of the account.`;
+Start with get_me: it says who you act as, their scan access (lifetime free scan, wallet, $RED holder state), and next_steps in order. Steps only a person can take come with a URL to hand them (for example installing the GitHub App or verifying a wallet). Calls that wait on the person (list_accounts and the device token) take wait=50 and return as soon as they're done. Follow next_steps; do not assume payment, credit packs or holder eligibility are available. You can start deep scans, follow them (get_scan with wait), read findings and fix them with get_fix_prompt, dismiss or reopen findings, and change settings.
+Accounts are GitHub accounts (a person or an organization) and can be named by login; repositories by owner/name. Settings changes need the person to be an admin of the account.`;
 
 function tools() {
   return OPERATIONS.map((op) => ({

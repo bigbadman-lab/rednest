@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
-import { createDb, decideDeviceGrant, schema, upsertFindings, upsertInstallation, type Db, type FindingInput } from "@sandchest/db";
+import { createDb, decideDeviceGrant, ensureUserEntitlement, schema, upsertFindings, upsertInstallation, type Db, type FindingInput } from "@sandchest/db";
 import { migrate } from "@sandchest/db/migrate";
 import type { GitHubApp } from "@sandchest/github";
 import { POST as mcpPost } from "@/app/api/mcp/route";
@@ -307,9 +307,35 @@ describe.skipIf(!available)("REST API", () => {
     const { body } = await api(aliceKey, "GET", "/me");
     expect(body.user.login).toBe("alice");
     expect(body.accounts.map((a: { login: string }) => a.login)).toEqual(["acme"]);
-    expect(body.next_steps[0]).toMatchObject({ step: "claim_free_credits", account: "acme" });
+    expect(body.free_credits).toBeNull();
+    expect(body.access.free_scan).toBe("available");
+    expect(body.access.holder_access_active).toBe(false);
+    expect(body.access.holder_status).toBe("not_activated");
+    expect(body.next_steps.map((s: { step: string }) => s.step)).not.toContain("claim_free_credits");
+    expect(body.next_steps.map((s: { step: string }) => s.step)).not.toContain("buy_credits");
+    expect(body.next_steps.map((s: { step: string }) => s.step)).not.toContain("join_plan");
+    expect(body.next_steps.some((s: { step: string }) => s.step === "start_deep_scan" || s.step === "lifetime_free_scan_available")).toBe(true);
+    expect(body.next_steps.some((s: { step: string }) => s.step === "fix_findings")).toBe(true);
     const bob = (await api(bobKey, "GET", "/me")).body;
-    expect(bob.next_steps[0]).toMatchObject({ step: "ask_admin_to_join" });
+    expect(bob.access.free_scan).toBe("available");
+    expect(bob.next_steps.map((s: { step: string }) => s.step)).not.toContain("ask_admin_to_join");
+    expect(bob.next_steps.map((s: { step: string }) => s.step)).not.toContain("claim_free_credits");
+  });
+
+  test("me: free scan consumed and holder inactive are represented without credit steps", async () => {
+    await ensureUserEntitlement(database, ids.alice);
+    const mark = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+    try {
+      await mark`update user_entitlements set free_scan_status = 'consumed', free_scan_consumed_at = now(), free_scan_scan_id = null where user_id = ${ids.alice}::uuid`;
+      const { body } = await api(aliceKey, "GET", "/me");
+      expect(body.access.free_scan).toBe("consumed");
+      expect(body.access.holder_access_active).toBe(false);
+      expect(body.next_steps[0]).toMatchObject({ step: "holder_access_inactive" });
+      expect(JSON.stringify(body.next_steps)).not.toMatch(/claim_free_credits|buy_credits|join_plan|Stripe|payment details/i);
+    } finally {
+      await mark`update user_entitlements set free_scan_status = 'available', free_scan_consumed_at = null, free_scan_scan_id = null where user_id = ${ids.alice}::uuid`;
+      await mark.end();
+    }
   });
 
   test("repos by owner/name, and scoped to the person", async () => {
@@ -467,6 +493,14 @@ describe.skipIf(!available)("MCP", () => {
     const me = await mcp(aliceKey, "tools/call", { name: "get_me", arguments: {} });
     expect(me.body!.result.structuredContent.user.login).toBe("alice");
     expect(JSON.parse(me.body!.result.content[0].text).user.login).toBe("alice");
+    expect(me.body!.result.structuredContent.access).toMatchObject({
+      holder_access_active: false,
+      holder_status: "not_activated",
+    });
+    expect(["available", "reserved", "consumed"]).toContain(me.body!.result.structuredContent.access.free_scan);
+    expect(me.body!.result.structuredContent.free_credits).toBeNull();
+    expect(JSON.stringify(me.body!.result.structuredContent.next_steps)).not.toMatch(/claim_free_credits|buy_credits|join_plan/);
+    expect(tools.find((t) => t.name === "get_me")!.inputSchema).toMatchObject({ type: "object", properties: {} });
 
     const missing = await mcp(aliceKey, "tools/call", { name: "get_finding", arguments: { id: "3f1c2b8e-1d2a-4b7c-9e0f-123456789abc" } });
     expect(missing.body!.result.structuredContent.error.code).toBe("not_found");

@@ -79,9 +79,20 @@ describe("structure", () => {
   });
 
   test("the agent setup prompt leads Getting started and matches the copy button's", () => {
-    const prompt = `\`\`\`text\n${setupPrompt("https://www.rednest.tech")}\n\`\`\``;
+    const prompt = `\`\`\`text\n${setupPrompt("https://rednest.tech")}\n\`\`\``;
     for (const name of ["index", "agents"]) expect(doc(name), name).toContain(prompt);
     expect(doc("index").match(/^## .+$/m)?.[0]).toBe("## Set up with your agent");
+  });
+
+  test("published agent instructions use the apex host, never www.rednest.tech", () => {
+    for (const name of ["index", "agents"]) {
+      expect(doc(name), name).not.toContain("www.rednest.tech");
+      expect(doc(name), name).toContain("https://rednest.tech/api/mcp");
+    }
+    expect(doc("agents")).toContain("claude mcp add --transport http sandchest https://rednest.tech/api/mcp");
+    expect(doc("agents")).toContain("codex mcp add sandchest --url https://rednest.tech/api/mcp");
+    expect(setupPrompt("https://rednest.tech")).toContain("https://rednest.tech/api/mcp");
+    expect(setupPrompt("https://rednest.tech")).not.toContain("www.rednest.tech");
   });
 
   test("docs pages are plain Markdown, so their Markdown copies are complete", () => {

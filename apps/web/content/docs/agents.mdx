@@ -12,8 +12,8 @@ Hosted access uses **one lifetime free scan** per GitHub account. **$RED holder 
 Press **Set up with your agent** on the home page and paste the prompt into your agent. It reads this page and does the rest:
 
 ```text
-Set up RedNest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://www.rednest.tech).
-Read https://www.rednest.tech/docs/agents.md and follow it. Connect to its MCP server (https://www.rednest.tech/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
+Set up RedNest for me: it finds exploitable vulnerabilities in my GitHub repositories (https://rednest.tech).
+Read https://rednest.tech/docs/agents.md and follow it. Connect to its MCP server (https://rednest.tech/api/mcp) if you can add one, otherwise use its HTTP API with the device flow.
 Then call get_me and work through next_steps. Only ask me for what needs me: approving the connection and installing the GitHub App. Do not assume payment or free credits are available.
 ```
 
@@ -29,21 +29,21 @@ Wallet verification for planned $RED holder access is done in the browser under 
 
 ## Connect over MCP
 
-The MCP server is `https://www.rednest.tech/api/mcp` (Streamable HTTP).
+The MCP server is `https://rednest.tech/api/mcp` (Streamable HTTP).
 
 ```bash
 # Claude Code
-claude mcp add --transport http sandchest https://www.rednest.tech/api/mcp
+claude mcp add --transport http sandchest https://rednest.tech/api/mcp
 
 # Codex
-codex mcp add sandchest --url https://www.rednest.tech/api/mcp
+codex mcp add sandchest --url https://rednest.tech/api/mcp
 codex mcp login sandchest
 ```
 
 ```json
 {
   "mcpServers": {
-    "sandchest": { "url": "https://www.rednest.tech/api/mcp" }
+    "sandchest": { "url": "https://rednest.tech/api/mcp" }
   }
 }
 ```
@@ -53,14 +53,14 @@ codex mcp login sandchest
 ## Connect over HTTP
 
 ```bash
-curl -s -X POST https://www.rednest.tech/api/v1/auth/device \
+curl -s -X POST https://rednest.tech/api/v1/auth/device \
   -H 'content-type: application/json' -d '{"client_name":"My agent"}'
 ```
 
 Give the person `verification_uri_complete`, then:
 
 ```bash
-curl -s -X POST https://www.rednest.tech/api/oauth/token \
+curl -s -X POST https://rednest.tech/api/oauth/token \
   -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
   -d device_code=scd_â€¦ -d wait=50
 ```
@@ -68,7 +68,7 @@ curl -s -X POST https://www.rednest.tech/api/oauth/token \
 Then call the API with the returned key:
 
 ```bash
-curl -s https://www.rednest.tech/api/v1/me -H "Authorization: Bearer $SANDCHEST_API_KEY"
+curl -s https://rednest.tech/api/v1/me -H "Authorization: Bearer $SANDCHEST_API_KEY"
 ```
 
 ## API keys
@@ -77,7 +77,7 @@ API keys act as the person who made them. Create or revoke them in **Settings â†
 
 ## Tools and endpoints
 
-Every tool is also an HTTP endpoint under `https://www.rednest.tech/api/v1`. `GET /api/v1` lists them; [`/api/v1/openapi.json`](/api/v1/openapi.json) describes them.
+Every tool is also an HTTP endpoint under `https://rednest.tech/api/v1`. `GET /api/v1` lists them; [`/api/v1/openapi.json`](/api/v1/openapi.json) describes them.
 
 | Tool | Endpoint | What it does |
 | --- | --- | --- |

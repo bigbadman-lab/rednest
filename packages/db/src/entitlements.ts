@@ -191,6 +191,13 @@ export async function getUserEntitlement(database: Db, userId: string) {
   return database.query.userEntitlements.findFirst({ where: eq(userEntitlements.userId, userId) });
 }
 
+/** Current UTC month's holder quota row, if any. Missing means unused allowance. */
+export async function getUserScanMonth(database: Db, userId: string, month = utcMonth()) {
+  return database.query.userScanMonths.findFirst({
+    where: and(eq(userScanMonths.userId, userId), eq(userScanMonths.monthUtc, month)),
+  });
+}
+
 export async function getOrgSponsor(database: Db, orgId: string) {
   return database.query.orgSponsors.findFirst({ where: eq(orgSponsors.orgId, orgId) });
 }
