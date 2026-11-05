@@ -35,7 +35,11 @@ export function homepageHidesMint(html: string): boolean {
 }
 
 export function homepageHolderInactive(html: string): boolean {
-  return /Token-holder scanning is not active yet/i.test(html);
+  return (
+    /Token-holder scanning is not active yet/i.test(html) ||
+    /\$RED has not launched yet/i.test(html) ||
+    /token has not launched/i.test(html)
+  );
 }
 
 export function homepageHolderActive(html: string): boolean {

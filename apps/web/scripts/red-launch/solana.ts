@@ -27,7 +27,11 @@ export function createSolanaClient(): SolanaClient {
       }
 
       const meta = await readMintDecimals(connection, new PublicKey(mint));
-      if ("error" in meta) return { error: meta.error };
+      if ("error" in meta) {
+        if (meta.error === "account_absent") return { error: "account_absent" };
+        if (meta.error === "not_a_mint") return { error: "not_a_mint" };
+        return { error: meta.error };
+      }
 
       let tokenProgram: MintOnChain["tokenProgram"];
       if (meta.ownerProgram.equals(TOKEN_2022_PROGRAM_ID)) tokenProgram = "token-2022";

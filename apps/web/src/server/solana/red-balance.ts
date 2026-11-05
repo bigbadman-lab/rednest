@@ -55,20 +55,22 @@ function parseAmount(raw: unknown): bigint | null {
   return null;
 }
 
+export type MintDecimalsError = "rpc_error" | "account_absent" | "not_a_mint" | "malformed";
+
 /** Reads mint decimals and owning token program from a trusted RPC mint account. */
 export async function readMintDecimals(
   rpc: RedBalanceRpc,
   mint: PublicKey,
-): Promise<{ decimals: number; ownerProgram: PublicKey } | { error: "rpc_error" | "malformed" }> {
+): Promise<{ decimals: number; ownerProgram: PublicKey } | { error: MintDecimalsError }> {
   let account: Awaited<ReturnType<RedBalanceRpc["getParsedAccountInfo"]>>;
   try {
     account = await rpc.getParsedAccountInfo(mint);
   } catch {
     return { error: "rpc_error" };
   }
-  if (!account.value) return { error: "malformed" };
+  if (!account.value) return { error: "account_absent" };
   const owner = account.value.owner;
-  if (!owner.equals(TOKEN_PROGRAM_ID) && !owner.equals(TOKEN_2022_PROGRAM_ID)) return { error: "malformed" };
+  if (!owner.equals(TOKEN_PROGRAM_ID) && !owner.equals(TOKEN_2022_PROGRAM_ID)) return { error: "not_a_mint" };
   const info = readParsedInfo(account.value.data);
   if (!info) return { error: "malformed" };
   const decimals = info.decimals;
@@ -156,13 +158,16 @@ export async function checkRedHolderBalance(input: {
       return new Connection(input.rpcUrl.trim(), { commitment: "confirmed" });
     })();
 
-  let mintMeta: { decimals: number; ownerProgram: PublicKey } | { error: "rpc_error" | "malformed" };
+  let mintMeta: { decimals: number; ownerProgram: PublicKey } | { error: MintDecimalsError };
   try {
     mintMeta = await readMintDecimals(rpc, mint);
   } catch {
     return { ok: false, reason: "rpc_error" };
   }
-  if ("error" in mintMeta) return { ok: false, reason: mintMeta.error };
+  if ("error" in mintMeta) {
+    // Balance API stays fail-closed with the existing reason vocabulary.
+    return { ok: false, reason: mintMeta.error === "rpc_error" ? "rpc_error" : "malformed" };
+  }
 
   const summed = await sumMintBalance(rpc, wallet, mint, mintMeta.ownerProgram);
   if ("error" in summed) return { ok: false, reason: summed.error };

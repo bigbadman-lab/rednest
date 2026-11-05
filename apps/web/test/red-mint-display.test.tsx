@@ -7,6 +7,7 @@ import {
   HOLDER_ACCESS_SUMMARY,
   HOLDER_STATUS_INACTIVE,
   MINT_COMING_SOON,
+  TOKEN_NOT_LAUNCHED,
 } from "@/lib/access-copy";
 import { holderScansEnabled, readRedMintDisplay } from "@/server/red-mint-display";
 
@@ -33,6 +34,22 @@ describe("readRedMintDisplay", () => {
       published: false,
       reason: "not_approved",
     });
+  });
+
+  test("unpublished reserved mint is never exposed in display payload or SSR HTML", () => {
+    const display = readRedMintDisplay({
+      RED_TOKEN_MINT: SAMPLE_MINT,
+      RED_MINT_PUBLIC: "false",
+      RED_HOLDER_SCANS_ENABLED: "false",
+    });
+    expect(display).toEqual({ published: false, reason: "not_approved" });
+    expect(JSON.stringify(display)).not.toContain(SAMPLE_MINT);
+
+    const html = renderToStaticMarkup(<RedAccessSectionView published={false} holdersActive={false} />);
+    expect(html).not.toContain(SAMPLE_MINT);
+    expect(html).not.toContain("solscan.io/token/");
+    expect(html).not.toContain('data-testid="red-mint-address"');
+    expect(html).toContain(MINT_COMING_SOON);
   });
 
   test("rejects invalid mint strings", () => {
@@ -101,6 +118,21 @@ describe("RedAccessSectionView", () => {
     expect(html).toContain("View on Solscan");
     expect(html).not.toContain(MINT_COMING_SOON);
     expect(html).toContain(HOLDER_STATUS_INACTIVE);
+    expect(html).toContain(TOKEN_NOT_LAUNCHED);
+    expect(html).toContain('data-testid="red-mint-not-launched"');
+  });
+
+  test("prelaunch wording clears once holders are active", () => {
+    const html = renderToStaticMarkup(
+      <RedAccessSectionView
+        published
+        mint={SAMPLE_MINT}
+        solscanUrl={`https://solscan.io/token/${SAMPLE_MINT}`}
+        holdersActive
+      />,
+    );
+    expect(html).toContain(SAMPLE_MINT);
+    expect(html).not.toContain(TOKEN_NOT_LAUNCHED);
   });
 
   test("holder-active status copy does not appear unless the launch flag is on", () => {

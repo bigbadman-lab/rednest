@@ -80,6 +80,173 @@ export async function cmdStatus(deps: LaunchDeps): Promise<CommandResult> {
   return { ok: true, code: 0 };
 }
 
+/**
+ * Prelaunch reserved-mint registration. Accepts an address with no on-chain mint
+ * account yet. Never enables holders or publishes. Configuring the address never
+ * claims the token is live.
+ */
+export async function cmdPrepare(
+  deps: LaunchDeps,
+  input: { mint: string; dryRun: boolean; yes: boolean },
+): Promise<CommandResult> {
+  const blocked = await requireTarget(deps);
+  if (blocked) return blocked;
+
+  const env = await deps.vercel.readProductionEnv();
+  const rpc = envValue(env, "SOLANA_RPC_URL");
+  if (rpc === undefined) return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown; refuse to prepare." };
+  if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured in production." };
+
+  // Fail closed on publish/holder flags before any mint mutation. Prepare never flips these.
+  const mintPublic = flagPresence(envValue(env, "RED_MINT_PUBLIC"));
+  const holders = flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED"));
+  if (mintPublic === "unknown") {
+    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is unknown; refuse to prepare." };
+  }
+  if (holders === "unknown") {
+    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is unknown; refuse to prepare." };
+  }
+  if (mintPublic === "true") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_MINT_PUBLIC is true. Prepare refuses to run while the mint is published — unpublish / reset publication first, or use a separate approved publish flow later.",
+    };
+  }
+  if (holders === "true") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_HOLDER_SCANS_ENABLED is true. Prepare refuses to run while holder access is enabled — disable holders first.",
+    };
+  }
+
+  const existing = envValue(env, "RED_TOKEN_MINT");
+  if (existing === undefined) return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown; refuse to mutate." };
+  const existingCanon = existing ? canonicalSolanaPubkey(existing) : null;
+  const nextCanon = canonicalSolanaPubkey(input.mint);
+  if (!nextCanon) return { ok: false, code: 2, error: "Invalid reserved mint: not a Solana public key." };
+
+  if (existingCanon && existingCanon !== nextCanon) {
+    return {
+      ok: false,
+      code: 3,
+      error: `Conflicting mint already registered (${existingCanon}). Refusing to replace without separate operator approval.`,
+    };
+  }
+
+  const onChain = await deps.solana.inspectMint(nextCanon, rpc);
+  if ("error" in onChain) {
+    if (onChain.error === "rpc_error") {
+      return { ok: false, code: 2, error: "RPC failed while checking the reserved mint. Refuse to prepare." };
+    }
+    if (onChain.error === "not_a_mint") {
+      return {
+        ok: false,
+        code: 2,
+        error: "Reserved address exists on-chain but is not a mint account. Refuse to prepare.",
+      };
+    }
+    if (onChain.error !== "account_absent") {
+      return { ok: false, code: 2, error: `Reserved mint check failed: ${onChain.error}` };
+    }
+    deps.io.log("On-chain: account absent (prelaunch reserved mint).");
+  } else {
+    return {
+      ok: false,
+      code: 2,
+      error:
+        "On-chain mint account already exists at this address. Use `register` for a live Pump.fun mint; prepare is reserved-address / prelaunch only.",
+    };
+  }
+
+  if (existingCanon === nextCanon) {
+    deps.io.log("RED_TOKEN_MINT already set to this reserved mint (idempotent).");
+  }
+
+  deps.io.log("Prelaunch prepare will NOT enable holder scans and will NOT publish the mint.");
+  deps.io.log("Configuring this address does not mean the token is live.");
+
+  const confirm = await confirmOrAbort(
+    deps,
+    `Confirm you control or have independently verified reserved mint ${nextCanon}. Set RED_TOKEN_MINT in production (holders disabled, mint unpublished) and deploy?`,
+    input.yes,
+    input.dryRun,
+  );
+  if (confirm) return confirm;
+
+  if (input.dryRun) {
+    deps.io.log("[dry-run] Would set RED_TOKEN_MINT to reserved address, deploy production, verify health; holders remain off; mint remains unpublished.");
+    return { ok: true, code: 0, message: "dry-run" };
+  }
+
+  try {
+    if (existingCanon !== nextCanon) {
+      // Only RED_TOKEN_MINT — never RED_MINT_PUBLIC or RED_HOLDER_SCANS_ENABLED.
+      await deps.vercel.setProductionEnv(ENV_MINT, nextCanon);
+      deps.io.log("Set RED_TOKEN_MINT (reserved / prelaunch).");
+    }
+    await deployAndVerifyAlias(deps);
+
+    const health = await deps.site.health();
+    if (!health.ok) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: reserved mint may be registered but /api/health failed after deploy.",
+      };
+    }
+
+    const after = await deps.vercel.readProductionEnv();
+    if (flagPresence(envValue(after, "RED_HOLDER_SCANS_ENABLED")) === "true") {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: holder access appears enabled after prepare. Unexpected — investigate before publish.",
+      };
+    }
+    if (flagPresence(envValue(after, "RED_MINT_PUBLIC")) === "true") {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: mint appears published after prepare. Prepare must not publish.",
+      };
+    }
+    if (flagPresence(envValue(after, "RED_MINT_PUBLIC")) === "unknown" || flagPresence(envValue(after, "RED_HOLDER_SCANS_ENABLED")) === "unknown") {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: could not re-read RED_MINT_PUBLIC / RED_HOLDER_SCANS_ENABLED after prepare.",
+      };
+    }
+
+    const html = await deps.site.homepageHtml();
+    if (!homepageHidesMint(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: mint may be visible before publish. Check RED_MINT_PUBLIC before continuing.",
+      };
+    }
+    if (!homepageHolderInactive(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: homepage does not show prelaunch holder-inactive wording after prepare.",
+      };
+    }
+
+    deps.io.log("Prepare complete. Reserved mint configured. Token is NOT live. Holder access remains disabled. Mint remains unpublished.");
+    return { ok: true, code: 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 4,
+      error: `Prepare failed: ${error instanceof Error ? error.message : String(error)}. Inspect production env before retrying.`,
+    };
+  }
+}
+
 export async function cmdRegister(
   deps: LaunchDeps,
   input: { mint: string; dryRun: boolean; yes: boolean },
@@ -194,19 +361,35 @@ export async function cmdPublish(deps: LaunchDeps, input: { dryRun: boolean; yes
   const health = await deps.site.health();
   if (!health.ok) return { ok: false, code: 2, error: "Production /api/health is not ok. Refuse to publish." };
 
+  const rpc = envValue(env, "SOLANA_RPC_URL");
+  let prelaunchReserved = false;
+  if (rpc) {
+    const onChain = await deps.solana.inspectMint(mint, rpc);
+    if ("error" in onChain && onChain.error === "account_absent") {
+      prelaunchReserved = true;
+      deps.io.log("On-chain mint absent — publishing a reserved address. Token has not launched.");
+    }
+  }
+
   const pub = flagPresence(envValue(env, "RED_MINT_PUBLIC"));
   if (pub === "true") deps.io.log("RED_MINT_PUBLIC already true (idempotent publish).");
 
   const confirm = await confirmOrAbort(
     deps,
-    `Publish official mint ${mint} on the homepage (RED_MINT_PUBLIC=true) and deploy?`,
+    prelaunchReserved
+      ? `Publish reserved mint ${mint} on the homepage (token has NOT launched; no trading claims; holders stay disabled). Set RED_MINT_PUBLIC=true and deploy?`
+      : `Publish official mint ${mint} on the homepage (RED_MINT_PUBLIC=true; holders stay disabled until activate) and deploy?`,
     input.yes,
     input.dryRun,
   );
   if (confirm) return confirm;
 
   if (input.dryRun) {
-    deps.io.log("[dry-run] Would set RED_MINT_PUBLIC=true, deploy, verify mint visible and holders still disabled.");
+    deps.io.log(
+      prelaunchReserved
+        ? "[dry-run] Would set RED_MINT_PUBLIC=true for reserved mint, deploy, verify mint visible with prelaunch wording; holders still disabled."
+        : "[dry-run] Would set RED_MINT_PUBLIC=true, deploy, verify mint visible and holders still disabled.",
+    );
     return { ok: true, code: 0, message: "dry-run" };
   }
 
@@ -227,14 +410,25 @@ export async function cmdPublish(deps: LaunchDeps, input: { dryRun: boolean; yes
         error: "Partial state: homepage does not show the full official mint / Solscan link yet.",
       };
     }
-    if (!homepageHolderInactive(html) && homepageHolderActive(html)) {
+    if (!homepageHolderInactive(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: homepage missing prelaunch / holder-inactive wording after publish.",
+      };
+    }
+    if (homepageHolderActive(html)) {
       return { ok: false, code: 4, error: "Partial state: holder access appears active after publish. Do not activate further until reviewed." };
     }
     if (flagPresence(envValue(await deps.vercel.readProductionEnv(), "RED_HOLDER_SCANS_ENABLED")) === "true") {
       return { ok: false, code: 4, error: "Partial state: RED_HOLDER_SCANS_ENABLED is true after publish." };
     }
 
-    deps.io.log("Publish complete. Holder access remains disabled.");
+    deps.io.log(
+      prelaunchReserved
+        ? "Publish complete for reserved mint. Token is not live. Holder access remains disabled."
+        : "Publish complete. Holder access remains disabled.",
+    );
     return { ok: true, code: 0 };
   } catch (error) {
     return {
@@ -330,12 +524,27 @@ export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; ye
   const health = await deps.site.health();
   if (!health.ok) return { ok: false, code: 2, error: "Production health check failed." };
 
+  const inspected = await requireVerifiedPumpMint(deps.solana, deps.pump, mint, rpc);
+  if ("error" in inspected) {
+    if (inspected.error === "account_absent") {
+      return {
+        ok: false,
+        code: 2,
+        error: "Activation rejected: on-chain mint account does not exist yet (create the Pump.fun token first).",
+      };
+    }
+    if (inspected.error === "not_a_mint") {
+      return { ok: false, code: 2, error: "Activation rejected: registered address is not a mint account." };
+    }
+    return { ok: false, code: 2, error: `Activation prerequisites failed: ${inspected.error}` };
+  }
+
   const probe = await deps.solana.probeHolderInfrastructure(mint, rpc);
   if (!probe.ok) {
     return { ok: false, code: 2, error: `Holder infrastructure check failed: ${probe.error}` };
   }
   deps.io.log(
-    `Infrastructure OK: mint=${probe.mint.mint} decimals=${probe.mint.decimals} program=${probe.mint.tokenProgram}; RPC balance queries succeed.`,
+    `Infrastructure OK: mint=${inspected.mint} decimals=${inspected.decimals} program=${inspected.tokenProgram}; pump.fun verified; RPC balance queries succeed.`,
   );
 
   if (flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED")) === "true") {

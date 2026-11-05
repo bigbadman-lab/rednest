@@ -6,6 +6,7 @@ import {
   HOLDER_STATUS_ACTIVE,
   HOLDER_STATUS_INACTIVE,
   MINT_COMING_SOON,
+  TOKEN_NOT_LAUNCHED,
 } from "@/lib/access-copy";
 import { holderScansEnabled, readRedMintDisplay } from "@/server/red-mint-display";
 
@@ -66,7 +67,14 @@ export function RedAccessSectionView({
 
       <div className="red-mint-panel" data-testid="red-mint-panel">
         {published && mint && solscanUrl ? (
-          <MintAddress mint={mint} solscanUrl={solscanUrl} />
+          <>
+            <MintAddress mint={mint} solscanUrl={solscanUrl} />
+            {!holdersActive ? (
+              <p className="red-mint-pending" data-testid="red-mint-not-launched">
+                {TOKEN_NOT_LAUNCHED}
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="red-mint-pending" data-testid="red-mint-pending">
             {MINT_COMING_SOON}

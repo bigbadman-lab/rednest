@@ -9,6 +9,7 @@ import { runLaunch } from "../scripts/red-launch/cli";
 import {
   cmdActivate,
   cmdDisable,
+  cmdPrepare,
   cmdPublish,
   cmdRegister,
   cmdStatus,
@@ -160,6 +161,12 @@ describe("parseArgs", () => {
   test("parses mutating flags", () => {
     const r = parseArgs(["register", "--mint", "Abc", "--dry-run", "--yes"]);
     expect(r).toMatchObject({ ok: true, command: "register", mint: "Abc", dryRun: true, yes: true });
+    const p = parseArgs(["prepare", "--mint", "Def", "--dry-run", "--yes"]);
+    expect(p).toMatchObject({ ok: true, command: "prepare", mint: "Def", dryRun: true, yes: true });
+  });
+
+  test("prepare requires --mint", () => {
+    expect(parseArgs(["prepare"]).ok).toBe(false);
   });
 });
 
@@ -196,6 +203,166 @@ describe("status", () => {
     if (!result.ok) expect(result.error).toContain("Fail-closed");
   });
 });
+
+describe("prepare", () => {
+  test("accepts valid reserved address when on-chain mint is absent", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      mintOnChain: { error: "account_absent" },
+      homepage: "Official mint address coming soon. Token-holder scanning is not active yet.",
+    });
+    const dry = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(dry.ok).toBe(true);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+
+    const live = await cmdPrepare(h.deps, { mint, dryRun: false, yes: true });
+    expect(live.ok).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_TOKEN_MINT" && s.value === mint)).toBe(true);
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.logs.some((l) => /NOT live|not live|prelaunch/i.test(l))).toBe(true);
+  });
+
+  test("rejects invalid reserved address", async () => {
+    const h = createHarness({ mintOnChain: { error: "account_absent" } });
+    const result = await cmdPrepare(h.deps, { mint: "not-a-mint", dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Invalid reserved mint|public key/i);
+  });
+
+  test("rejects conflicting registered mint", async () => {
+    const a = await sampleMint();
+    const b = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: a, SOLANA_RPC_URL: "https://rpc.test", RED_MINT_PUBLIC: null, RED_HOLDER_SCANS_ENABLED: null },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdPrepare(h.deps, { mint: b, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Conflicting mint/);
+  });
+
+  test("rejects existing non-mint account", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({ mintOnChain: { error: "not_a_mint" } });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not a mint account/i);
+  });
+
+  test("rejects when on-chain mint already exists (use register)", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({});
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/already exists|use `register`/i);
+  });
+
+  test("RPC failure blocks prepare", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({ mintOnChain: { error: "rpc_error" } });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/RPC failed/i);
+  });
+
+  test("dry-run never mutates production", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({ mintOnChain: { error: "account_absent" } });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("keeps holder access disabled after prepare", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      mintOnChain: { error: "account_absent" },
+      homepage: "Official mint address coming soon. Token-holder scanning is not active yet.",
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(flagPresenceLike(h.env.RED_HOLDER_SCANS_ENABLED)).not.toBe("true");
+    expect(h.sets.every((s) => s.name === "RED_TOKEN_MINT")).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_MINT_PUBLIC" || s.name === "RED_HOLDER_SCANS_ENABLED")).toBe(false);
+  });
+
+  test("refuses when RED_MINT_PUBLIC is already true", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: "true",
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/RED_MINT_PUBLIC is true/i);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("refuses when RED_HOLDER_SCANS_ENABLED is already true", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/RED_HOLDER_SCANS_ENABLED is true/i);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("fails closed when publish or holder flags are unreadable", async () => {
+    const mint = await sampleMint();
+    const hPublic = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _unknown: { RED_MINT_PUBLIC: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const pubUnknown = await cmdPrepare(hPublic.deps, { mint, dryRun: true, yes: true });
+    expect(pubUnknown.ok).toBe(false);
+    if (!pubUnknown.ok) expect(pubUnknown.error).toMatch(/RED_MINT_PUBLIC is unknown/i);
+    expect(hPublic.sets).toEqual([]);
+
+    const hHolders = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _unknown: { RED_HOLDER_SCANS_ENABLED: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const holdersUnknown = await cmdPrepare(hHolders.deps, { mint, dryRun: true, yes: true });
+    expect(holdersUnknown.ok).toBe(false);
+    if (!holdersUnknown.ok) expect(holdersUnknown.error).toMatch(/RED_HOLDER_SCANS_ENABLED is unknown/i);
+    expect(hHolders.sets).toEqual([]);
+  });
+});
+
+function flagPresenceLike(value: string | null | undefined): string {
+  if (value == null || value === "") return "absent";
+  return value.trim().toLowerCase() === "true" ? "true" : "false";
+}
 
 describe("register", () => {
   test("rejects invalid mint", async () => {
@@ -309,12 +476,25 @@ describe("publish", () => {
     const mint = await sampleMint();
     const h = createHarness({
       env: { RED_TOKEN_MINT: mint, SOLANA_RPC_URL: "https://rpc.test", RED_MINT_PUBLIC: null, RED_HOLDER_SCANS_ENABLED: "false" },
-      homepage: `Official $RED mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet.`,
+      homepage: `Official $RED mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet. $RED has not launched yet`,
     });
     const result = await cmdPublish(h.deps, { dryRun: false, yes: true });
     expect(result.ok).toBe(true);
     expect(h.sets.some((s) => s.name === "RED_MINT_PUBLIC" && s.value === "true")).toBe(true);
     expect(h.env.RED_HOLDER_SCANS_ENABLED).toBe("false");
+  });
+
+  test("publication of reserved mint keeps prelaunch wording", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, SOLANA_RPC_URL: "https://rpc.test", RED_MINT_PUBLIC: null, RED_HOLDER_SCANS_ENABLED: null },
+      mintOnChain: { error: "account_absent" },
+      homepage: `Official $RED mint ${mint} https://solscan.io/token/${mint} This mint address is reserved. $RED has not launched yet — holder scanning stays disabled until activation. Token-holder scanning is not active yet.`,
+    });
+    const result = await cmdPublish(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.logs.some((l) => /has not launched|reserved/i.test(l))).toBe(true);
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
   });
 });
 
@@ -361,6 +541,7 @@ describe("activate", () => {
     const mint = await sampleMint();
     const h = createHarness({
       env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+      pumpOk: true,
     });
     const dry = await cmdActivate(h.deps, { dryRun: true, yes: true });
     expect(dry.ok).toBe(true);
@@ -370,6 +551,40 @@ describe("activate", () => {
     expect(live.ok).toBe(true);
     expect(h.sets.some((s) => s.name === "RED_HOLDER_SCANS_ENABLED" && s.value === "true")).toBe(true);
     expect(h.state.deploys).toBe(1);
+  });
+
+  test("activation before token creation is rejected", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/does not exist yet|account_absent|create the Pump\.fun/i);
+    expect(h.sets).toEqual([]);
+  });
+
+  test("activation after valid Pump.fun mint creation is permitted", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+      pumpOk: true,
+    });
+    const result = await cmdActivate(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBe("true");
+  });
+
+  test("Pump.fun verification failure blocks activation", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: { RED_TOKEN_MINT: mint, RED_MINT_PUBLIC: "true", SOLANA_RPC_URL: "https://rpc.test", RED_HOLDER_SCANS_ENABLED: null },
+      pumpOk: false,
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/pump_fun_unverified|Activation prerequisites/i);
   });
 
   test("missing canonical mint blocks activation", async () => {

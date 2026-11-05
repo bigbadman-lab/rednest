@@ -4,6 +4,7 @@
  * Does not create tokens. Pump.fun remains the token creation platform.
  *
  *   bun run red:launch status
+ *   bun run red:launch prepare --mint <RESERVED_MINT> [--dry-run] [--yes]
  *   bun run red:launch register --mint <MINT> [--dry-run] [--yes]
  *   bun run red:launch publish [--dry-run] [--yes]
  *   bun run red:launch verify --eligible <W> --ineligible <W>
@@ -14,7 +15,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { join } from "node:path";
 import { parseArgs, usage } from "./args";
-import { cmdActivate, cmdDisable, cmdPublish, cmdRegister, cmdStatus, cmdVerify } from "./commands";
+import { cmdActivate, cmdDisable, cmdPrepare, cmdPublish, cmdRegister, cmdStatus, cmdVerify } from "./commands";
 import { VERIFY_STATE_RELATIVE } from "./config";
 import { createPumpClient, createSolanaClient } from "./solana";
 import { createSiteClient } from "./site";
@@ -58,6 +59,9 @@ export async function runLaunch(argv: string[], deps: LaunchDeps = createDefault
   switch (parsed.command) {
     case "status":
       result = await cmdStatus(deps);
+      break;
+    case "prepare":
+      result = await cmdPrepare(deps, { mint: parsed.mint!, dryRun: parsed.dryRun, yes: parsed.yes });
       break;
     case "register":
       result = await cmdRegister(deps, { mint: parsed.mint!, dryRun: parsed.dryRun, yes: parsed.yes });

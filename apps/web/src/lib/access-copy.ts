@@ -19,3 +19,7 @@ export const HOLDER_STATUS_INACTIVE =
 export const HOLDER_STATUS_ACTIVE = "Token-holder scanning is enabled for eligible verified wallets.";
 
 export const MINT_COMING_SOON = "Official mint address coming soon.";
+
+/** Shown with a published reserved mint before holder activation / on-chain launch. */
+export const TOKEN_NOT_LAUNCHED =
+  "This mint address is reserved. $RED has not launched yet — holder scanning stays disabled until activation.";

@@ -3,7 +3,7 @@
  * Rejects unknown flags; mutating commands accept --dry-run and --yes.
  */
 
-export type LaunchCommand = "status" | "register" | "publish" | "verify" | "activate" | "disable";
+export type LaunchCommand = "status" | "prepare" | "register" | "publish" | "verify" | "activate" | "disable";
 
 export type ParsedArgs =
   | { ok: false; error: string }
@@ -17,9 +17,10 @@ export type ParsedArgs =
       ineligible?: string;
     };
 
-const COMMANDS = new Set<LaunchCommand>(["status", "register", "publish", "verify", "activate", "disable"]);
+const COMMANDS = new Set<LaunchCommand>(["status", "prepare", "register", "publish", "verify", "activate", "disable"]);
 
-const MUTATING = new Set<LaunchCommand>(["register", "publish", "activate", "disable"]);
+const MUTATING = new Set<LaunchCommand>(["prepare", "register", "publish", "activate", "disable"]);
+const MINT_COMMANDS = new Set<LaunchCommand>(["prepare", "register"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice();
@@ -83,21 +84,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { ok: false, error: `Unsupported flag "${a}".\n\n${usage()}` };
   }
 
-  if (dryRun && !MUTATING.has(command) && command !== "verify") {
-    // status ignores dry-run; verify allows it as a no-op label
-  }
-  if (command === "register" && !mint) return { ok: false, error: "register requires --mint <MINT>." };
+  if (MINT_COMMANDS.has(command) && !mint) return { ok: false, error: `${command} requires --mint <MINT>.` };
   if (command === "verify" && (!eligible || !ineligible)) {
     return { ok: false, error: "verify requires --eligible <WALLET> and --ineligible <WALLET>." };
   }
-  if (command !== "register" && mint !== undefined) {
-    return { ok: false, error: `--mint is only valid for register.` };
+  if (!MINT_COMMANDS.has(command) && mint !== undefined) {
+    return { ok: false, error: `--mint is only valid for prepare or register.` };
   }
   if (command !== "verify" && (eligible !== undefined || ineligible !== undefined)) {
     return { ok: false, error: `--eligible / --ineligible are only valid for verify.` };
   }
   if (dryRun && command === "status") {
     return { ok: false, error: "status does not accept --dry-run." };
+  }
+  if (dryRun && !MUTATING.has(command) && command !== "verify") {
+    // status already rejected; verify allows dry-run as a no-op label
   }
 
   return { ok: true, command, dryRun, yes, mint, eligible, ineligible };
@@ -106,6 +107,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export function usage(): string {
   return `Usage:
   bun run red:launch status
+  bun run red:launch prepare --mint <RESERVED_MINT> [--dry-run] [--yes]
   bun run red:launch register --mint <MINT> [--dry-run] [--yes]
   bun run red:launch publish [--dry-run] [--yes]
   bun run red:launch verify --eligible <WALLET> --ineligible <WALLET>   # optional diagnostic
@@ -114,5 +116,7 @@ export function usage(): string {
 
 Targets only Vercel team cope2 / project rednest / production.
 Does not create tokens. Pump.fun remains the token creation platform.
-activate requires mint registration, publication, healthy RPC/mint infrastructure, and confirmation — not wallet Stage C receipts.`;
+prepare registers a reserved mint before on-chain creation (holders stay disabled; never claims the token is live).
+register requires an existing on-chain Pump.fun mint.
+activate requires registered mint, publication, valid on-chain Pump.fun mint, healthy RPC, and confirmation — not wallet Stage C receipts.`;
 }
