@@ -1,12 +1,19 @@
 import type { RedBalanceResult } from "../../src/server/solana/red-balance";
 
+export type EnvKey = "RED_TOKEN_MINT" | "RED_MINT_PUBLIC" | "RED_HOLDER_SCANS_ENABLED" | "SOLANA_RPC_URL";
+
 export type EnvMap = {
   RED_TOKEN_MINT?: string | null;
   RED_MINT_PUBLIC?: string | null;
   RED_HOLDER_SCANS_ENABLED?: string | null;
   SOLANA_RPC_URL?: string | null;
-  /** When a key cannot be read reliably. */
-  _unknown?: Partial<Record<"RED_TOKEN_MINT" | "RED_MINT_PUBLIC" | "RED_HOLDER_SCANS_ENABLED" | "SOLANA_RPC_URL", true>>;
+  /** When a key cannot be read reliably (pull failed, etc.). */
+  _unknown?: Partial<Record<EnvKey, true>>;
+  /**
+   * When Vercel `env pull` redacts a Secret as `[SENSITIVE]` (or equivalent).
+   * The placeholder is never treated as the real value.
+   */
+  _protected?: Partial<Record<EnvKey, true>>;
 };
 
 export type DeploymentInfo = {
@@ -46,6 +53,11 @@ export type VerifyReceipt = {
 
 export type VercelClient = {
   assertTarget(): Promise<{ team: string; project: string }>;
+  /**
+   * Fail-closed git cleanliness check. Call before any production env write so a
+   * later deploy refusal cannot leave partial env mutations.
+   */
+  assertDeployableSource(): Promise<{ gitSha: string }>;
   readProductionEnv(): Promise<EnvMap>;
   setProductionEnv(name: string, value: string): Promise<void>;
   removeProductionEnv(name: string): Promise<void>;

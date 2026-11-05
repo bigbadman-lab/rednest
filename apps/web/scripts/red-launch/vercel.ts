@@ -16,9 +16,9 @@ import {
   PRODUCTION_ALIASES,
   PRODUCTION_URL,
 } from "./config";
-import { redactSecrets } from "./sanitize";
+import { isProtectedEnvPlaceholder, redactSecrets } from "./sanitize";
 import { createGitClient, requireCleanApprovedRevision, type GitClient } from "./source";
-import type { DeploymentInfo, EnvMap, VercelClient } from "./types";
+import type { DeploymentInfo, EnvKey, EnvMap, VercelClient } from "./types";
 
 export type RunCommand = (
   argv: string[],
@@ -56,6 +56,11 @@ function vercelScope(run: RunCommand, extra: string[], options?: { timeoutMs?: n
 
 export function createVercelClient(run: RunCommand = defaultRunCommand, git: GitClient = createGitClient(run)): VercelClient {
   return {
+    async assertDeployableSource() {
+      const sha = requireCleanApprovedRevision(await git.revision());
+      return { gitSha: sha };
+    },
+
     async assertTarget() {
       const listed = await vercelScope(run, ["project", "ls"], { timeoutMs: 60_000 });
       if (listed.code !== 0) {
@@ -120,8 +125,17 @@ export function createVercelClient(run: RunCommand = defaultRunCommand, git: Git
 
     async setProductionEnv(name, value) {
       const existing = await this.readProductionEnv();
-      const current = existing[name as keyof EnvMap];
-      const known = current !== undefined && current !== null;
+      const key = name as EnvKey;
+      if (existing._protected?.[key]) {
+        throw new Error(
+          `Existing ${name} is protected (Vercel Secret / [SENSITIVE] on pull). Refuse to overwrite automatically — verify in the Vercel dashboard or re-enter as a Config (--no-sensitive) value under separate approval.`,
+        );
+      }
+      if (existing._unknown?.[key]) {
+        throw new Error(`Existing ${name} is unreadable; refuse to overwrite automatically.`);
+      }
+      const current = existing[key];
+      const known = current !== undefined && current !== null && String(current).trim() !== "";
       if (known && String(current) === value) return; // idempotent
 
       if (known) {
@@ -194,6 +208,7 @@ export function createVercelClient(run: RunCommand = defaultRunCommand, git: Git
     },
 
     async deployProduction() {
+      // Defense in depth — mutating commands must also call assertDeployableSource first.
       const revision = requireCleanApprovedRevision(await git.revision());
       const deployed = await run(
         [
@@ -283,16 +298,22 @@ export function createVercelClient(run: RunCommand = defaultRunCommand, git: Git
 
 export function parseEnvFile(body: string): EnvMap {
   const map: EnvMap = {};
-  const wanted = new Set([ENV_MINT, ENV_MINT_PUBLIC, ENV_HOLDER, ENV_RPC]);
+  const wanted = new Set<EnvKey>([ENV_MINT, ENV_MINT_PUBLIC, ENV_HOLDER, ENV_RPC]);
   for (const line of body.split(/\r?\n/)) {
     if (!line || line.startsWith("#")) continue;
     const eq = line.indexOf("=");
     if (eq < 0) continue;
-    const key = line.slice(0, eq).trim();
+    const key = line.slice(0, eq).trim() as EnvKey;
     if (!wanted.has(key)) continue;
     let value = line.slice(eq + 1).trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
+    }
+    if (isProtectedEnvPlaceholder(value)) {
+      map._protected = { ...map._protected, [key]: true };
+      // Never store the placeholder as if it were the real mint/flag/RPC value.
+      (map as Record<string, string | null>)[key] = null;
+      continue;
     }
     (map as Record<string, string | null>)[key] = value;
   }

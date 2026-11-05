@@ -27,6 +27,8 @@ async function sampleMint(): Promise<string> {
 function createHarness(init: {
   env?: EnvMap;
   assertError?: string;
+  /** When true, assertDeployableSource fails (simulates dirty tree / untracked files). */
+  dirtyWorkingTree?: boolean;
   deployFails?: boolean;
   healthOk?: boolean;
   homepage?: string;
@@ -60,10 +62,24 @@ function createHarness(init: {
         if (init.assertError) throw new Error(init.assertError);
         return { team: "cope2", project: "rednest" };
       },
+      async assertDeployableSource() {
+        if (init.dirtyWorkingTree) {
+          throw new Error(
+            "Working tree is dirty. Commit or stash changes so the launch CLI deploys the approved git revision only.",
+          );
+        }
+        return { gitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+      },
       async readProductionEnv() {
-        return { ...env };
+        return { ...env, _unknown: env._unknown ? { ...env._unknown } : undefined, _protected: env._protected ? { ...env._protected } : undefined };
       },
       async setProductionEnv(name, value) {
+        if (env._protected?.[name as keyof NonNullable<EnvMap["_protected"]>]) {
+          throw new Error(`Existing ${name} is protected (Vercel Secret / [SENSITIVE] on pull). Refuse to overwrite automatically`);
+        }
+        if (env._unknown?.[name as keyof NonNullable<EnvMap["_unknown"]>]) {
+          throw new Error(`Existing ${name} is unreadable; refuse to overwrite automatically.`);
+        }
         sets.push({ name, value });
         (env as Record<string, string | null>)[name] = value;
       },
@@ -176,6 +192,88 @@ describe("parseEnvFile", () => {
     expect(env.RED_TOKEN_MINT).toBe("Mint111");
     expect(env.SOLANA_RPC_URL).toContain("secret");
     expect(env.RED_MINT_PUBLIC).toBeNull();
+  });
+
+  test("never treats [SENSITIVE] as a real mint or flag value", () => {
+    const env = parseEnvFile(
+      `RED_TOKEN_MINT="[SENSITIVE]"\nRED_MINT_PUBLIC=[SENSITIVE]\nRED_HOLDER_SCANS_ENABLED=false\nSOLANA_RPC_URL="[SENSITIVE]"\n`,
+    );
+    expect(env.RED_TOKEN_MINT).toBeNull();
+    expect(env._protected?.RED_TOKEN_MINT).toBe(true);
+    expect(env._protected?.RED_MINT_PUBLIC).toBe(true);
+    expect(env._protected?.SOLANA_RPC_URL).toBe(true);
+    expect(env.RED_HOLDER_SCANS_ENABLED).toBe("false");
+    expect(env._protected?.RED_HOLDER_SCANS_ENABLED).toBeUndefined();
+    expect(JSON.stringify(env)).not.toMatch(/\[SENSITIVE\]/);
+  });
+});
+
+describe("protected mint status and overwrite refusal", () => {
+  test("status reports protected mint, not invalid pubkey", async () => {
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+    });
+    const result = await cmdStatus(h.deps);
+    expect(result.ok).toBe(true);
+    expect(h.logs.some((l) => /RED_TOKEN_MINT: configured \(protected/.test(l))).toBe(true);
+    expect(h.logs.some((l) => /invalid pubkey/.test(l))).toBe(false);
+    expect(h.logs.some((l) => /\[SENSITIVE\]/.test(l))).toBe(false);
+  });
+
+  test("prepare refuses when existing mint is protected without writing", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/protected|Refuse to overwrite/i);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+});
+
+describe("cleanliness before env writes", () => {
+  test("prepare refuses dirty working tree before any production env write", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      dirtyWorkingTree: true,
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/dirty/i);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("partial deploy failure after a successful mint write is reported without flipping publish/holder flags", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      mintOnChain: { error: "account_absent" },
+      deployFails: true,
+      homepage: "Official mint address coming soon. Token-holder scanning is not active yet.",
+    });
+    const result = await cmdPrepare(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Prepare failed|deploy/i);
+    expect(h.sets.some((s) => s.name === "RED_TOKEN_MINT" && s.value === mint)).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_MINT_PUBLIC" || s.name === "RED_HOLDER_SCANS_ENABLED")).toBe(false);
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
   });
 });
 

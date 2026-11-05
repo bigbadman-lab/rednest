@@ -15,17 +15,37 @@ import {
   homepageSolscanFor,
 } from "./site";
 import { writeVerifyReceipt } from "./state";
-import type { CommandResult, EnvMap, LaunchDeps, VerifyReceipt } from "./types";
+import type { CommandResult, EnvKey, EnvMap, LaunchDeps, VerifyReceipt } from "./types";
 
-function envValue(env: EnvMap, key: keyof EnvMap): string | null | undefined {
-  if (env._unknown?.[key as keyof NonNullable<EnvMap["_unknown"]>]) return undefined;
+function envValue(env: EnvMap, key: EnvKey): string | null | undefined {
+  if (env._unknown?.[key] || env._protected?.[key]) return undefined;
   return env[key] as string | null | undefined;
+}
+
+function envKeyState(env: EnvMap, key: EnvKey): "absent" | "unknown" | "protected" | "present" {
+  if (env._unknown?.[key]) return "unknown";
+  if (env._protected?.[key]) return "protected";
+  const value = env[key];
+  if (value === undefined) return "unknown";
+  if (value === null || String(value).trim() === "") return "absent";
+  return "present";
 }
 
 async function requireTarget(deps: LaunchDeps): Promise<CommandResult | null> {
   try {
     const target = await deps.vercel.assertTarget();
     deps.io.log(`Target: team=${target.team} project=${target.project} env=production`);
+    return null;
+  } catch (error) {
+    return { ok: false, code: 2, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Must run before any production env write so a dirty tree cannot cause partial mutations. */
+async function requireCleanSource(deps: LaunchDeps): Promise<CommandResult | null> {
+  try {
+    const { gitSha } = await deps.vercel.assertDeployableSource();
+    deps.io.log(`Source revision ${gitSha.slice(0, 7)} is clean and deployable.`);
     return null;
   } catch (error) {
     return { ok: false, code: 2, error: error instanceof Error ? error.message : String(error) };
@@ -61,15 +81,21 @@ export async function cmdStatus(deps: LaunchDeps): Promise<CommandResult> {
   if (blocked) return blocked;
 
   const env = await deps.vercel.readProductionEnv();
-  const mintRaw = envValue(env, "RED_TOKEN_MINT");
-  const mintFlag = mintRaw === undefined ? "unknown" : mintRaw ? "configured" : "absent";
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  const mintRaw = mintState === "present" ? env.RED_TOKEN_MINT : null;
   const mintCanon = mintRaw ? canonicalSolanaPubkey(mintRaw) : null;
+  let mintLabel: string;
+  if (mintState === "absent") mintLabel = "absent";
+  else if (mintState === "unknown") mintLabel = "unknown";
+  else if (mintState === "protected") mintLabel = "configured (protected — value not readable via CLI)";
+  else if (mintCanon) mintLabel = `configured (${mintCanon})`;
+  else mintLabel = "configured (invalid pubkey)";
 
   deps.io.log("Production $RED launch status");
-  deps.io.log(`  RED_TOKEN_MINT: ${mintFlag}${mintCanon ? ` (${mintCanon})` : mintRaw && mintRaw !== undefined ? " (invalid pubkey)" : ""}`);
-  deps.io.log(`  RED_MINT_PUBLIC: ${flagPresence(envValue(env, "RED_MINT_PUBLIC"))}`);
-  deps.io.log(`  RED_HOLDER_SCANS_ENABLED: ${flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED"))}`);
-  deps.io.log(`  SOLANA_RPC_URL: ${rpcPresence(envValue(env, "SOLANA_RPC_URL"))}`);
+  deps.io.log(`  RED_TOKEN_MINT: ${mintLabel}`);
+  deps.io.log(`  RED_MINT_PUBLIC: ${describeFlag(env, "RED_MINT_PUBLIC")}`);
+  deps.io.log(`  RED_HOLDER_SCANS_ENABLED: ${describeFlag(env, "RED_HOLDER_SCANS_ENABLED")}`);
+  deps.io.log(`  SOLANA_RPC_URL: ${describeRpc(env)}`);
 
   const deployment = await deps.vercel.latestProductionDeployment();
   if (!deployment) deps.io.log("  Latest production deployment: unknown");
@@ -78,6 +104,20 @@ export async function cmdStatus(deps: LaunchDeps): Promise<CommandResult> {
   const health = await deps.site.health();
   deps.io.log(`  /api/health: ${health.ok ? "ok" : "unhealthy"}`);
   return { ok: true, code: 0 };
+}
+
+function describeFlag(env: EnvMap, key: "RED_MINT_PUBLIC" | "RED_HOLDER_SCANS_ENABLED"): string {
+  const state = envKeyState(env, key);
+  if (state === "protected") return "protected";
+  if (state === "unknown") return "unknown";
+  return flagPresence(env[key]);
+}
+
+function describeRpc(env: EnvMap): string {
+  const state = envKeyState(env, "SOLANA_RPC_URL");
+  if (state === "protected") return "configured (protected)";
+  if (state === "unknown") return "unknown";
+  return rpcPresence(env.SOLANA_RPC_URL);
 }
 
 /**
@@ -91,21 +131,29 @@ export async function cmdPrepare(
 ): Promise<CommandResult> {
   const blocked = await requireTarget(deps);
   if (blocked) return blocked;
+  // Cleanliness before any env write — avoids partial state if deploy would refuse later.
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
 
   const env = await deps.vercel.readProductionEnv();
-  const rpc = envValue(env, "SOLANA_RPC_URL");
-  if (rpc === undefined) return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown; refuse to prepare." };
+  const rpcState = envKeyState(env, "SOLANA_RPC_URL");
+  if (rpcState === "unknown" || rpcState === "protected") {
+    return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown or protected; refuse to prepare." };
+  }
+  const rpc = env.SOLANA_RPC_URL;
   if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured in production." };
 
   // Fail closed on publish/holder flags before any mint mutation. Prepare never flips these.
-  const mintPublic = flagPresence(envValue(env, "RED_MINT_PUBLIC"));
-  const holders = flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED"));
-  if (mintPublic === "unknown") {
-    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is unknown; refuse to prepare." };
+  const mintPublicState = envKeyState(env, "RED_MINT_PUBLIC");
+  const holdersState = envKeyState(env, "RED_HOLDER_SCANS_ENABLED");
+  if (mintPublicState === "unknown" || mintPublicState === "protected") {
+    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is unknown or protected; refuse to prepare." };
   }
-  if (holders === "unknown") {
-    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is unknown; refuse to prepare." };
+  if (holdersState === "unknown" || holdersState === "protected") {
+    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is unknown or protected; refuse to prepare." };
   }
+  const mintPublic = flagPresence(env.RED_MINT_PUBLIC);
+  const holders = flagPresence(env.RED_HOLDER_SCANS_ENABLED);
   if (mintPublic === "true") {
     return {
       ok: false,
@@ -121,8 +169,19 @@ export async function cmdPrepare(
     };
   }
 
-  const existing = envValue(env, "RED_TOKEN_MINT");
-  if (existing === undefined) return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown; refuse to mutate." };
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  if (mintState === "protected") {
+    return {
+      ok: false,
+      code: 2,
+      error:
+        "Existing RED_TOKEN_MINT is protected (not readable via CLI). Refuse to overwrite — verify the value in the Vercel dashboard; re-enter as Config (--no-sensitive) only under separate approval if replacement is required.",
+    };
+  }
+  if (mintState === "unknown") {
+    return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown; refuse to mutate." };
+  }
+  const existing = mintState === "present" ? env.RED_TOKEN_MINT : null;
   const existingCanon = existing ? canonicalSolanaPubkey(existing) : null;
   const nextCanon = canonicalSolanaPubkey(input.mint);
   if (!nextCanon) return { ok: false, code: 2, error: "Invalid reserved mint: not a Solana public key." };
@@ -253,14 +312,25 @@ export async function cmdRegister(
 ): Promise<CommandResult> {
   const blocked = await requireTarget(deps);
   if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
 
   const env = await deps.vercel.readProductionEnv();
   const rpc = envValue(env, "SOLANA_RPC_URL");
-  if (rpc === undefined) return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown; refuse to register." };
+  if (rpc === undefined) return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown or protected; refuse to register." };
   if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured in production." };
 
-  const existing = envValue(env, "RED_TOKEN_MINT");
-  if (existing === undefined) return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown; refuse to mutate." };
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  if (mintState === "protected") {
+    return {
+      ok: false,
+      code: 2,
+      error:
+        "Existing RED_TOKEN_MINT is protected (not readable via CLI). Refuse to overwrite — verify in the Vercel dashboard; do not replace automatically.",
+    };
+  }
+  if (mintState === "unknown") return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown; refuse to mutate." };
+  const existing = mintState === "present" ? env.RED_TOKEN_MINT : null;
   const existingCanon = existing ? canonicalSolanaPubkey(existing) : null;
   const nextCanon = canonicalSolanaPubkey(input.mint);
   if (!nextCanon) return { ok: false, code: 2, error: "Invalid mint: not a Solana public key." };
@@ -351,12 +421,22 @@ export async function cmdRegister(
 export async function cmdPublish(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
   const blocked = await requireTarget(deps);
   if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
 
   const env = await deps.vercel.readProductionEnv();
-  const mintRaw = envValue(env, "RED_TOKEN_MINT");
-  if (mintRaw === undefined) return { ok: false, code: 2, error: "RED_TOKEN_MINT unknown; refuse to publish." };
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  if (mintState === "protected") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_TOKEN_MINT is protected (not readable via CLI). Refuse to publish until the mint can be verified as Config, not Secret.",
+    };
+  }
+  if (mintState === "unknown") return { ok: false, code: 2, error: "RED_TOKEN_MINT unknown; refuse to publish." };
+  const mintRaw = mintState === "present" ? env.RED_TOKEN_MINT : null;
   const mint = mintRaw ? canonicalSolanaPubkey(mintRaw) : null;
-  if (!mint) return { ok: false, code: 2, error: "Canonical mint is not registered. Run register first." };
+  if (!mint) return { ok: false, code: 2, error: "Canonical mint is not registered. Run prepare/register first." };
 
   const health = await deps.site.health();
   if (!health.ok) return { ok: false, code: 2, error: "Production /api/health is not ok. Refuse to publish." };
@@ -508,8 +588,16 @@ export async function cmdVerify(
 export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
   const blocked = await requireTarget(deps);
   if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
 
   const env = await deps.vercel.readProductionEnv();
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  const rpcState = envKeyState(env, "SOLANA_RPC_URL");
+  const publishedState = envKeyState(env, "RED_MINT_PUBLIC");
+  if (mintState === "protected" || rpcState === "protected" || publishedState === "protected") {
+    return { ok: false, code: 2, error: "Production mint/RPC/publish config is protected; refuse to activate without a readable Config value." };
+  }
   const mintRaw = envValue(env, "RED_TOKEN_MINT");
   const rpc = envValue(env, "SOLANA_RPC_URL");
   const published = flagPresence(envValue(env, "RED_MINT_PUBLIC"));
@@ -587,8 +675,13 @@ export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; ye
 export async function cmdDisable(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
   const blocked = await requireTarget(deps);
   if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
 
   const env = await deps.vercel.readProductionEnv();
+  if (envKeyState(env, "RED_HOLDER_SCANS_ENABLED") === "protected") {
+    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is protected; refuse to mutate via CLI." };
+  }
   const holder = flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED"));
   if (holder === "unknown") return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED unknown; refuse to mutate." };
   if (holder === "false" || holder === "absent") {
