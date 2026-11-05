@@ -27,8 +27,10 @@ export function LandingPage({ visitor }: { visitor: Visitor }) {
             Add a hacker to your team.
           </h1>
           <p className="hero-lede">
-            RedNest connects to your GitHub repositories, runs automated security scans, and
-            delivers actionable vulnerability findings with attack paths and fix guidance.
+            Secure your entire codebase with AI-powered Deep Scans, automated GitHub PR reviews and
+            actionable fixes through Claude Code, Cursor, Codex or any MCP-connected agent. Powered
+            by $RED, with 50,000 tokens unlocking 50 monthly Deep Scans and organization-wide
+            security coverage.
           </p>
           <div className="hero-actions">
             <HeroKey href={visitor === "signed-in" ? site.links.dashboard : site.links.getStarted} track="hero-get-started">Get started</HeroKey>
