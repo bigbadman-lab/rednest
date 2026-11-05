@@ -17,6 +17,7 @@ import {
   PRODUCTION_URL,
 } from "./config";
 import { isProtectedEnvPlaceholder, redactSecrets } from "./sanitize";
+import { resolveMonorepoDeployRoot } from "./deploy-root";
 import { createGitClient, requireCleanApprovedRevision, type GitClient } from "./source";
 import type { DeploymentInfo, EnvKey, EnvMap, VercelClient } from "./types";
 
@@ -54,7 +55,13 @@ function vercelScope(run: RunCommand, extra: string[], options?: { timeoutMs?: n
   return run(["vercel", ...extra, "--scope", LAUNCH_TEAM], options);
 }
 
-export function createVercelClient(run: RunCommand = defaultRunCommand, git: GitClient = createGitClient(run)): VercelClient {
+export function createVercelClient(
+  run: RunCommand = defaultRunCommand,
+  git: GitClient = createGitClient(run),
+  options?: { deployRoot?: string; cwd?: string },
+): VercelClient {
+  const deployRoot = () => options?.deployRoot ?? resolveMonorepoDeployRoot(options?.cwd ?? process.cwd());
+
   return {
     async assertDeployableSource() {
       const sha = requireCleanApprovedRevision(await git.revision());
@@ -246,11 +253,16 @@ export function createVercelClient(run: RunCommand = defaultRunCommand, git: Git
     async deployProduction() {
       // Defense in depth — mutating commands must also call assertDeployableSource first.
       const revision = requireCleanApprovedRevision(await git.revision());
+      // Always deploy from the monorepo root. Project Root Directory is apps/web;
+      // deploying from apps/web doubles that path to apps/web/apps/web.
+      const root = deployRoot();
       const deployed = await run(
         [
           "vercel",
           "deploy",
           "--prod",
+          "--cwd",
+          root,
           "--scope",
           LAUNCH_TEAM,
           "--project",

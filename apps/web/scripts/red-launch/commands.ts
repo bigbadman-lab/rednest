@@ -918,3 +918,123 @@ export async function cmdDisable(deps: LaunchDeps, input: { dryRun: boolean; yes
     };
   }
 }
+
+/**
+ * Deploy-only recovery: ship the clean approved revision with the current
+ * Production environment. Never rewrites RED_TOKEN_MINT, RED_MINT_PUBLIC, or
+ * RED_HOLDER_SCANS_ENABLED.
+ */
+export async function cmdDeploy(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
+  const blocked = await requireTarget(deps);
+  if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
+
+  const before = await deps.vercel.readProductionEnv();
+  const mintState = envKeyState(before, "RED_TOKEN_MINT");
+  if (mintState === "unknown") {
+    return { ok: false, code: 2, error: "RED_TOKEN_MINT is unknown; refuse deploy-only until mint is readable." };
+  }
+  if (mintState === "protected") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_TOKEN_MINT is still protected. Use recover-mint before deploy-only.",
+    };
+  }
+  if (mintState === "absent") {
+    return { ok: false, code: 2, error: "RED_TOKEN_MINT is absent. Register or recover a mint before deploy-only." };
+  }
+  const mintCanon = canonicalSolanaPubkey(before.RED_TOKEN_MINT ?? "");
+  if (!mintCanon) {
+    return { ok: false, code: 2, error: "RED_TOKEN_MINT is not a valid Solana public key; refuse deploy-only." };
+  }
+  if (flagPresence(before.RED_MINT_PUBLIC) === "true") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_MINT_PUBLIC is true. Deploy-only recovery expects an unpublished mint; use publish flow instead.",
+    };
+  }
+  if (flagPresence(before.RED_HOLDER_SCANS_ENABLED) === "true") {
+    return {
+      ok: false,
+      code: 2,
+      error: "RED_HOLDER_SCANS_ENABLED is true. Deploy-only recovery refuses while holders are enabled.",
+    };
+  }
+  if (envKeyState(before, "RED_MINT_PUBLIC") === "unknown" || envKeyState(before, "RED_HOLDER_SCANS_ENABLED") === "unknown") {
+    return { ok: false, code: 2, error: "Publish or holder flag is unreadable; refuse deploy-only." };
+  }
+  if (envKeyState(before, "RED_MINT_PUBLIC") === "protected" || envKeyState(before, "RED_HOLDER_SCANS_ENABLED") === "protected") {
+    return { ok: false, code: 2, error: "Publish or holder flag is protected; refuse deploy-only." };
+  }
+
+  const confirm = await confirmOrAbort(
+    deps,
+    `Deploy approved revision with current Production env (mint ${mintCanon} unchanged; publish/holder flags untouched)?`,
+    input.yes,
+    input.dryRun,
+  );
+  if (confirm) return confirm;
+
+  if (input.dryRun) {
+    deps.io.log(
+      "[dry-run] Would deploy from monorepo root (not apps/web), wait for Ready, verify rednest.tech alias and /api/health; leave RED_TOKEN_MINT / RED_MINT_PUBLIC / RED_HOLDER_SCANS_ENABLED untouched.",
+    );
+    return { ok: true, code: 0, message: "dry-run" };
+  }
+
+  try {
+    await deployAndVerifyAlias(deps);
+
+    const health = await deps.site.health();
+    if (!health.ok) {
+      return { ok: false, code: 4, error: "Deploy finished but /api/health failed." };
+    }
+
+    const html = await deps.site.homepageHtml();
+    if (!homepageHidesMint(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Homepage may expose the mint after deploy-only; expected mint hidden while unpublished.",
+      };
+    }
+    if (!homepageHolderInactive(html) || homepageHolderActive(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Homepage missing private/prelaunch holder-inactive wording after deploy-only.",
+      };
+    }
+
+    const after = await deps.vercel.readProductionEnv();
+    const afterMint = after.RED_TOKEN_MINT ? canonicalSolanaPubkey(after.RED_TOKEN_MINT) : null;
+    if (!afterMint || afterMint !== mintCanon || after.RED_TOKEN_MINT !== mintCanon) {
+      return {
+        ok: false,
+        code: 4,
+        error: `Post-deploy mint mismatch: expected exact ${mintCanon}. Env may have changed outside this command.`,
+      };
+    }
+    if (flagPresence(after.RED_MINT_PUBLIC) === "true" || flagPresence(after.RED_HOLDER_SCANS_ENABLED) === "true") {
+      return {
+        ok: false,
+        code: 4,
+        error: "Publish or holder flag became true during deploy-only. Investigate Production env.",
+      };
+    }
+
+    deps.io.log(
+      `Deploy-only complete. RED_TOKEN_MINT=${mintCanon} unchanged. RED_MINT_PUBLIC and RED_HOLDER_SCANS_ENABLED untouched. Mint remains unpublished.`,
+    );
+    return { ok: true, code: 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 4,
+      error: `Deploy-only failed: ${error instanceof Error ? error.message : String(error)}. Production env was not rewritten by this command.`,
+    };
+  }
+}

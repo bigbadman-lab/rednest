@@ -11,6 +11,7 @@
  *   bun run red:launch verify --eligible <W> --ineligible <W>
  *   bun run red:launch activate [--dry-run] [--yes]
  *   bun run red:launch disable [--dry-run] [--yes]
+ *   bun run red:launch deploy [--dry-run] [--yes]
  */
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -18,6 +19,7 @@ import { join } from "node:path";
 import { parseArgs, usage } from "./args";
 import {
   cmdActivate,
+  cmdDeploy,
   cmdDisable,
   cmdPrepare,
   cmdPublish,
@@ -90,6 +92,9 @@ export async function runLaunch(argv: string[], deps: LaunchDeps = createDefault
       break;
     case "disable":
       result = await cmdDisable(deps, { dryRun: parsed.dryRun, yes: parsed.yes });
+      break;
+    case "deploy":
+      result = await cmdDeploy(deps, { dryRun: parsed.dryRun, yes: parsed.yes });
       break;
   }
 

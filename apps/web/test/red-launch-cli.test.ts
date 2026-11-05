@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Keypair } from "@solana/web3.js";
@@ -8,6 +8,7 @@ import { parseArgs } from "../scripts/red-launch/args";
 import { runLaunch } from "../scripts/red-launch/cli";
 import {
   cmdActivate,
+  cmdDeploy,
   cmdDisable,
   cmdPrepare,
   cmdPublish,
@@ -16,10 +17,15 @@ import {
   cmdStatus,
   cmdVerify,
 } from "../scripts/red-launch/commands";
+import {
+  isNestedWebPackageCwd,
+  resolveMonorepoDeployRoot,
+  VERCEL_PROJECT_ROOT_DIRECTORY,
+} from "../scripts/red-launch/deploy-root";
 import { RPC_PROBE_WALLET } from "../scripts/red-launch/solana";
 import type { EnvMap, LaunchDeps, MintOnChain } from "../scripts/red-launch/types";
 import { requireCleanApprovedRevision } from "../scripts/red-launch/source";
-import { evaluateProductionAlias, parseEnvFile } from "../scripts/red-launch/vercel";
+import { createVercelClient, evaluateProductionAlias, parseEnvFile } from "../scripts/red-launch/vercel";
 
 async function sampleMint(): Promise<string> {
   return (await Keypair.generate()).publicKey.toBase58();
@@ -1085,5 +1091,184 @@ describe("production alias verification", () => {
         deployment,
       ).ok,
     ).toBe(false);
+  });
+});
+
+describe("monorepo deploy root", () => {
+  test("resolves monorepo root from nested apps/web cwd", () => {
+    const root = mkdtempSync(join(tmpdir(), "red-launch-mono-"));
+    try {
+      mkdirSync(join(root, VERCEL_PROJECT_ROOT_DIRECTORY), { recursive: true });
+      writeFileSync(join(root, "package.json"), JSON.stringify({ name: "mono", workspaces: ["apps/*"] }));
+      writeFileSync(join(root, VERCEL_PROJECT_ROOT_DIRECTORY, "package.json"), JSON.stringify({ name: "web" }));
+      const nested = join(root, VERCEL_PROJECT_ROOT_DIRECTORY);
+      expect(resolveMonorepoDeployRoot(nested)).toBe(root);
+      expect(resolveMonorepoDeployRoot(root)).toBe(root);
+      expect(isNestedWebPackageCwd(nested, root)).toBe(true);
+      expect(isNestedWebPackageCwd(root, root)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses paths that cannot resolve a monorepo root", () => {
+    const orphan = mkdtempSync(join(tmpdir(), "red-launch-orphan-"));
+    try {
+      expect(() => resolveMonorepoDeployRoot(orphan)).toThrow(/Unable to locate monorepo root/i);
+    } finally {
+      rmSync(orphan, { recursive: true, force: true });
+    }
+  });
+
+  test("deployProduction passes --cwd monorepo root, never nested apps/web", async () => {
+    const root = mkdtempSync(join(tmpdir(), "red-launch-deploy-cwd-"));
+    const captured: string[][] = [];
+    try {
+      mkdirSync(join(root, VERCEL_PROJECT_ROOT_DIRECTORY), { recursive: true });
+      writeFileSync(join(root, "package.json"), JSON.stringify({ name: "mono" }));
+      writeFileSync(join(root, VERCEL_PROJECT_ROOT_DIRECTORY, "package.json"), JSON.stringify({ name: "web" }));
+
+      const client = createVercelClient(
+        async (argv) => {
+          captured.push(argv);
+          if (argv[0] === "vercel" && argv[1] === "deploy") {
+            return {
+              code: 0,
+              stdout: "https://rednest-from-root.vercel.app",
+              stderr: "",
+            };
+          }
+          return { code: 0, stdout: "", stderr: "" };
+        },
+        {
+          async revision() {
+            return { sha: "c".repeat(40), short: "ccccccc", clean: true };
+          },
+        },
+        { cwd: join(root, VERCEL_PROJECT_ROOT_DIRECTORY) },
+      );
+
+      const deployment = await client.deployProduction();
+      expect(deployment.url).toContain("rednest-from-root");
+      const deployArgv = captured.find((a) => a[0] === "vercel" && a[1] === "deploy");
+      expect(deployArgv).toBeDefined();
+      const cwdIdx = deployArgv!.indexOf("--cwd");
+      expect(cwdIdx).toBeGreaterThan(-1);
+      expect(deployArgv![cwdIdx + 1]).toBe(root);
+      expect(deployArgv![cwdIdx + 1]).not.toBe(join(root, VERCEL_PROJECT_ROOT_DIRECTORY));
+      expect(deployArgv).toContain("--prod");
+      expect(deployArgv).toContain("cope2");
+      expect(deployArgv).toContain("rednest");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("deploy-only", () => {
+  const homepagePrivate = "Official mint address coming soon. Token-holder scanning is not active yet.";
+
+  test("deploys without rewriting mint or publish/holder flags", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+      homepage: homepagePrivate,
+    });
+    const result = await cmdDeploy(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(1);
+    expect(h.env.RED_TOKEN_MINT).toBe(mint);
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
+  });
+
+  test("dry-run never deploys or writes env", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+    });
+    const result = await cmdDeploy(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("refuses dirty tree before deploy", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      dirtyWorkingTree: true,
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+    });
+    const result = await cmdDeploy(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    expect(h.state.deploys).toBe(0);
+    expect(h.sets).toEqual([]);
+  });
+
+  test("refuses when publish or holders are enabled", async () => {
+    const mint = await sampleMint();
+    const published = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: "true",
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+    });
+    const holders = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+    });
+    expect((await cmdDeploy(published.deps, { dryRun: false, yes: true })).ok).toBe(false);
+    expect((await cmdDeploy(holders.deps, { dryRun: false, yes: true })).ok).toBe(false);
+    expect(published.state.deploys).toBe(0);
+    expect(holders.state.deploys).toBe(0);
+  });
+
+  test("parseArgs accepts deploy", () => {
+    expect(parseArgs(["deploy", "--yes", "--dry-run"])).toMatchObject({
+      ok: true,
+      command: "deploy",
+      yes: true,
+      dryRun: true,
+    });
+  });
+});
+
+describe("status recovered mint", () => {
+  test("reports readable Config mint pubkey, not protected", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+      },
+    });
+    const result = await cmdStatus(h.deps);
+    expect(result.ok).toBe(true);
+    expect(h.logs.some((l) => l.includes(`RED_TOKEN_MINT: configured (${mint})`))).toBe(true);
+    expect(h.logs.some((l) => /protected/i.test(l) && /RED_TOKEN_MINT/.test(l))).toBe(false);
   });
 });

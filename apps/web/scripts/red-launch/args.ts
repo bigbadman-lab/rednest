@@ -11,7 +11,8 @@ export type LaunchCommand =
   | "publish"
   | "verify"
   | "activate"
-  | "disable";
+  | "disable"
+  | "deploy";
 
 export type ParsedArgs =
   | { ok: false; error: string }
@@ -34,9 +35,19 @@ const COMMANDS = new Set<LaunchCommand>([
   "verify",
   "activate",
   "disable",
+  "deploy",
 ]);
 
-const MUTATING = new Set<LaunchCommand>(["prepare", "recover-mint", "register", "publish", "activate", "disable"]);
+/** Env-mutating or production-deploying operator commands. */
+const MUTATING = new Set<LaunchCommand>([
+  "prepare",
+  "recover-mint",
+  "register",
+  "publish",
+  "activate",
+  "disable",
+  "deploy",
+]);
 const MINT_COMMANDS = new Set<LaunchCommand>(["prepare", "recover-mint", "register"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -131,11 +142,13 @@ export function usage(): string {
   bun run red:launch verify --eligible <WALLET> --ineligible <WALLET>   # optional diagnostic
   bun run red:launch activate [--dry-run] [--yes]
   bun run red:launch disable [--dry-run] [--yes]
+  bun run red:launch deploy [--dry-run] [--yes]
 
 Targets only Vercel team cope2 / project rednest / production.
 Does not create tokens. Pump.fun remains the token creation platform.
 prepare registers a reserved mint before on-chain creation (holders stay disabled; never claims the token is live).
 recover-mint is a one-time recovery that replaces an unreadable Secret RED_TOKEN_MINT with a readable Config value (never publishes or enables holders). If env rm succeeds and Config add fails, it reports PARTIAL RECOVERY, refuses deploy, and does not claim success.
 register requires an existing on-chain Pump.fun mint.
-activate requires registered mint, publication, valid on-chain Pump.fun mint, healthy RPC, and confirmation — not wallet Stage C receipts.`;
+activate requires registered mint, publication, valid on-chain Pump.fun mint, healthy RPC, and confirmation — not wallet Stage C receipts.
+deploy ships the clean approved revision with the current Production env (no env writes). Always deploys from the monorepo root so Vercel Root Directory apps/web is not doubled.`;
 }
