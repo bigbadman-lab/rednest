@@ -3,7 +3,15 @@
  * Rejects unknown flags; mutating commands accept --dry-run and --yes.
  */
 
-export type LaunchCommand = "status" | "prepare" | "register" | "publish" | "verify" | "activate" | "disable";
+export type LaunchCommand =
+  | "status"
+  | "prepare"
+  | "recover-mint"
+  | "register"
+  | "publish"
+  | "verify"
+  | "activate"
+  | "disable";
 
 export type ParsedArgs =
   | { ok: false; error: string }
@@ -17,10 +25,19 @@ export type ParsedArgs =
       ineligible?: string;
     };
 
-const COMMANDS = new Set<LaunchCommand>(["status", "prepare", "register", "publish", "verify", "activate", "disable"]);
+const COMMANDS = new Set<LaunchCommand>([
+  "status",
+  "prepare",
+  "recover-mint",
+  "register",
+  "publish",
+  "verify",
+  "activate",
+  "disable",
+]);
 
-const MUTATING = new Set<LaunchCommand>(["prepare", "register", "publish", "activate", "disable"]);
-const MINT_COMMANDS = new Set<LaunchCommand>(["prepare", "register"]);
+const MUTATING = new Set<LaunchCommand>(["prepare", "recover-mint", "register", "publish", "activate", "disable"]);
+const MINT_COMMANDS = new Set<LaunchCommand>(["prepare", "recover-mint", "register"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice();
@@ -89,7 +106,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { ok: false, error: "verify requires --eligible <WALLET> and --ineligible <WALLET>." };
   }
   if (!MINT_COMMANDS.has(command) && mint !== undefined) {
-    return { ok: false, error: `--mint is only valid for prepare or register.` };
+    return { ok: false, error: `--mint is only valid for prepare, recover-mint, or register.` };
   }
   if (command !== "verify" && (eligible !== undefined || ineligible !== undefined)) {
     return { ok: false, error: `--eligible / --ineligible are only valid for verify.` };
@@ -108,6 +125,7 @@ export function usage(): string {
   return `Usage:
   bun run red:launch status
   bun run red:launch prepare --mint <RESERVED_MINT> [--dry-run] [--yes]
+  bun run red:launch recover-mint --mint <MINT> [--dry-run] [--yes]
   bun run red:launch register --mint <MINT> [--dry-run] [--yes]
   bun run red:launch publish [--dry-run] [--yes]
   bun run red:launch verify --eligible <WALLET> --ineligible <WALLET>   # optional diagnostic
@@ -117,6 +135,7 @@ export function usage(): string {
 Targets only Vercel team cope2 / project rednest / production.
 Does not create tokens. Pump.fun remains the token creation platform.
 prepare registers a reserved mint before on-chain creation (holders stay disabled; never claims the token is live).
+recover-mint is a one-time recovery that replaces an unreadable Secret RED_TOKEN_MINT with a readable Config value (never publishes or enables holders). If env rm succeeds and Config add fails, it reports PARTIAL RECOVERY, refuses deploy, and does not claim success.
 register requires an existing on-chain Pump.fun mint.
 activate requires registered mint, publication, valid on-chain Pump.fun mint, healthy RPC, and confirmation — not wallet Stage C receipts.`;
 }

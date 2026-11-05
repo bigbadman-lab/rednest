@@ -60,6 +60,13 @@ export type VercelClient = {
   assertDeployableSource(): Promise<{ gitSha: string }>;
   readProductionEnv(): Promise<EnvMap>;
   setProductionEnv(name: string, value: string): Promise<void>;
+  /**
+   * One-time recovery: remove existing Production var (including Secrets) and
+   * re-add as a readable Config (`--type config` / `--no-sensitive`). Never used
+   * by prepare/register — only recover-mint after explicit operator approval.
+   * If remove succeeds and add fails, throws with `partialRecovery: true`.
+   */
+  replaceProductionEnvAsConfig(name: string, value: string): Promise<void>;
   removeProductionEnv(name: string): Promise<void>;
   /** Deploys clean git HEAD only; refuses a dirty working tree. */
   deployProduction(): Promise<DeploymentInfo>;
@@ -68,6 +75,9 @@ export type VercelClient = {
   verifyProductionAlias(deployment: DeploymentInfo): Promise<void>;
   latestProductionDeployment(): Promise<DeploymentInfo | null>;
 };
+
+/** Thrown when env rm succeeded but Config re-add did not. */
+export type PartialMintRecoveryError = Error & { partialRecovery: true; envName: string };
 
 export type SolanaClient = {
   inspectMint(mint: string, rpcUrl: string): Promise<MintOnChain | { error: string }>;

@@ -306,6 +306,202 @@ export async function cmdPrepare(
   }
 }
 
+/**
+ * One-time recovery: replace an unreadable (Secret / [SENSITIVE]) Production
+ * RED_TOKEN_MINT with a readable Config value. Never publishes or enables holders.
+ */
+export async function cmdRecoverMint(
+  deps: LaunchDeps,
+  input: { mint: string; dryRun: boolean; yes: boolean },
+): Promise<CommandResult> {
+  const blocked = await requireTarget(deps);
+  if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
+
+  const env = await deps.vercel.readProductionEnv();
+
+  const nextCanon = canonicalSolanaPubkey(input.mint);
+  if (!nextCanon) return { ok: false, code: 2, error: "Invalid mint: not a Solana public key." };
+
+  const rpcState = envKeyState(env, "SOLANA_RPC_URL");
+  if (rpcState === "unknown" || rpcState === "protected") {
+    return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown or protected; refuse to recover-mint." };
+  }
+  const rpc = env.SOLANA_RPC_URL;
+  if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured in production." };
+
+  // Publication + holder must be readable and disabled before mutation.
+  const mintPublicState = envKeyState(env, "RED_MINT_PUBLIC");
+  const holdersState = envKeyState(env, "RED_HOLDER_SCANS_ENABLED");
+  if (mintPublicState === "unknown" || mintPublicState === "protected") {
+    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is unknown or protected; refuse to recover-mint." };
+  }
+  if (holdersState === "unknown" || holdersState === "protected") {
+    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is unknown or protected; refuse to recover-mint." };
+  }
+  if (flagPresence(env.RED_MINT_PUBLIC) === "true") {
+    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is true. Refuse recover-mint while the mint is published." };
+  }
+  if (flagPresence(env.RED_HOLDER_SCANS_ENABLED) === "true") {
+    return { ok: false, code: 2, error: "RED_HOLDER_SCANS_ENABLED is true. Refuse recover-mint while holder access is enabled." };
+  }
+
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  if (mintState === "unknown") {
+    return { ok: false, code: 2, error: "Existing RED_TOKEN_MINT is unknown (env pull failed); refuse to recover-mint." };
+  }
+  if (mintState === "absent") {
+    return { ok: false, code: 2, error: "RED_TOKEN_MINT is absent. Use prepare for first-time reserved registration, not recover-mint." };
+  }
+  if (mintState === "present") {
+    const existingCanon = canonicalSolanaPubkey(env.RED_TOKEN_MINT ?? "");
+    if (existingCanon && existingCanon !== nextCanon) {
+      return {
+        ok: false,
+        code: 3,
+        error: `Readable RED_TOKEN_MINT already set to a different mint (${existingCanon}). Refuse recover-mint conflict.`,
+      };
+    }
+    if (existingCanon === nextCanon) {
+      deps.io.log("RED_TOKEN_MINT is already readable and matches the recovery mint (idempotent Config path).");
+    }
+  } else if (mintState === "protected") {
+    deps.io.log("Existing RED_TOKEN_MINT is protected (Secret / [SENSITIVE] on pull) — recovery will replace it as Config.");
+  }
+
+  const onChain = await deps.solana.inspectMint(nextCanon, rpc);
+  if ("error" in onChain) {
+    if (onChain.error === "rpc_error") {
+      return { ok: false, code: 2, error: "RPC failed while inspecting the recovery mint. Refuse to recover-mint." };
+    }
+    if (onChain.error === "not_a_mint") {
+      return { ok: false, code: 2, error: "Recovery address exists on-chain but is not a mint account." };
+    }
+    if (onChain.error === "account_absent") {
+      deps.io.log("On-chain: account absent (prelaunch reserved mint recovery).");
+    } else {
+      return { ok: false, code: 2, error: `Mint inspection failed: ${onChain.error}` };
+    }
+  } else {
+    const inspected = await requireVerifiedPumpMint(deps.solana, deps.pump, nextCanon, rpc);
+    if ("error" in inspected) {
+      return { ok: false, code: 2, error: `Live mint recovery requires Pump.fun verification: ${inspected.error}` };
+    }
+    deps.io.log(
+      `On-chain mint verified: decimals=${inspected.decimals} program=${inspected.tokenProgram}; pump.fun OK.`,
+    );
+  }
+
+  deps.io.log("recover-mint will ONLY replace RED_TOKEN_MINT as a readable Config value.");
+  deps.io.log("It will NOT set RED_MINT_PUBLIC or RED_HOLDER_SCANS_ENABLED.");
+
+  const confirm = await confirmOrAbort(
+    deps,
+    `AUTHORIZE recovery: replace the unreadable Production RED_TOKEN_MINT with Config value ${nextCanon}, then deploy (holders off, mint unpublished)?`,
+    input.yes,
+    input.dryRun,
+  );
+  if (confirm) return confirm;
+
+  if (input.dryRun) {
+    deps.io.log(
+      "[dry-run] Would remove protected/existing RED_TOKEN_MINT, add it as Config (--type config), read back exact match, deploy; leave publish/holder untouched.",
+    );
+    return { ok: true, code: 0, message: "dry-run" };
+  }
+
+  try {
+    const alreadyReadableMatch =
+      mintState === "present" && canonicalSolanaPubkey(env.RED_TOKEN_MINT ?? "") === nextCanon;
+    if (!alreadyReadableMatch) {
+      try {
+        await deps.vercel.replaceProductionEnvAsConfig(ENV_MINT, nextCanon);
+      } catch (error) {
+        const partial = error && typeof error === "object" && "partialRecovery" in error && (error as { partialRecovery?: boolean }).partialRecovery;
+        if (partial) {
+          return {
+            ok: false,
+            code: 4,
+            error:
+              error instanceof Error
+                ? error.message
+                : `PARTIAL RECOVERY: RED_TOKEN_MINT may be absent after env rm. Do not deploy. Re-run recover-mint --mint ${nextCanon} or restore Config in the Vercel dashboard.`,
+          };
+        }
+        throw error;
+      }
+      deps.io.log("Replaced RED_TOKEN_MINT as Config.");
+    }
+
+    const afterWrite = await deps.vercel.readProductionEnv();
+    if (afterWrite._protected?.RED_TOKEN_MINT || afterWrite._unknown?.RED_TOKEN_MINT) {
+      return {
+        ok: false,
+        code: 4,
+        error:
+          "Readback failed: RED_TOKEN_MINT is still protected or unreadable after Config write. Do not deploy. Do not publish/activate. Re-check Vercel Production env for cope2/rednest.",
+      };
+    }
+    const readback = afterWrite.RED_TOKEN_MINT ?? null;
+    const readbackCanon = readback ? canonicalSolanaPubkey(readback) : null;
+    if (!readback || !readbackCanon || readbackCanon !== nextCanon || readback !== nextCanon) {
+      return {
+        ok: false,
+        code: 4,
+        error: `Readback mismatch or missing mint after write (expected exact ${nextCanon}). Refuse to deploy. Do not publish/activate. Re-run recover-mint or set Config RED_TOKEN_MINT in the Vercel dashboard.`,
+      };
+    }
+    deps.io.log("Readback OK: RED_TOKEN_MINT matches recovery mint exactly.");
+
+    if (flagPresence(afterWrite.RED_MINT_PUBLIC) === "true" || flagPresence(afterWrite.RED_HOLDER_SCANS_ENABLED) === "true") {
+      return {
+        ok: false,
+        code: 4,
+        error: "Unexpected: publish or holder flag is true after mint recovery. Abort before deploy.",
+      };
+    }
+
+    // Exact Config readback succeeded — only then deploy.
+    await deployAndVerifyAlias(deps);
+
+    const health = await deps.site.health();
+    if (!health.ok) {
+      return { ok: false, code: 4, error: "Partial state: mint recovered but /api/health failed after deploy." };
+    }
+
+    const html = await deps.site.homepageHtml();
+    if (!homepageHidesMint(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: homepage may expose the mint while publication is disabled.",
+      };
+    }
+    if (!homepageHolderInactive(html) || homepageHolderActive(html)) {
+      return {
+        ok: false,
+        code: 4,
+        error: "Partial state: homepage missing private/prelaunch holder-inactive wording after recover-mint.",
+      };
+    }
+
+    const finalEnv = await deps.vercel.readProductionEnv();
+    if (flagPresence(finalEnv.RED_MINT_PUBLIC) === "true" || flagPresence(finalEnv.RED_HOLDER_SCANS_ENABLED) === "true") {
+      return { ok: false, code: 4, error: "Partial state: publish/holder flags changed during recover-mint." };
+    }
+
+    deps.io.log("recover-mint complete. RED_TOKEN_MINT is readable Config. Token not published. Holder access remains disabled.");
+    return { ok: true, code: 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 4,
+      error: `recover-mint failed: ${error instanceof Error ? error.message : String(error)}. Inspect Production RED_TOKEN_MINT before retrying.`,
+    };
+  }
+}
+
 export async function cmdRegister(
   deps: LaunchDeps,
   input: { mint: string; dryRun: boolean; yes: boolean },

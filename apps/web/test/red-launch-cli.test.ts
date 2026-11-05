@@ -11,6 +11,7 @@ import {
   cmdDisable,
   cmdPrepare,
   cmdPublish,
+  cmdRecoverMint,
   cmdRegister,
   cmdStatus,
   cmdVerify,
@@ -30,6 +31,10 @@ function createHarness(init: {
   /** When true, assertDeployableSource fails (simulates dirty tree / untracked files). */
   dirtyWorkingTree?: boolean;
   deployFails?: boolean;
+  /** When true, readback after Config replace still looks protected. */
+  readbackStaysProtected?: boolean;
+  /** When true, replaceProductionEnvAsConfig fails after remove (partial recovery). */
+  configAddFailsAfterRm?: boolean;
   healthOk?: boolean;
   homepage?: string;
   mintOnChain?: MintOnChain | { error: string };
@@ -83,8 +88,35 @@ function createHarness(init: {
         sets.push({ name, value });
         (env as Record<string, string | null>)[name] = value;
       },
+      async replaceProductionEnvAsConfig(name, value) {
+        // Simulate rm first.
+        (env as Record<string, string | null>)[name] = null;
+        if (env._protected) {
+          const next = { ...env._protected };
+          delete next[name as keyof typeof next];
+          env._protected = Object.keys(next).length ? next : undefined;
+        }
+        if (init.configAddFailsAfterRm) {
+          const error = new Error(
+            `PARTIAL RECOVERY: removed Production ${name} but failed to re-add as Config. ${name} may now be ABSENT. Do not deploy.`,
+          ) as Error & { partialRecovery: true; envName: string };
+          error.partialRecovery = true;
+          error.envName = name;
+          throw error;
+        }
+        sets.push({ name, value });
+        (env as Record<string, string | null>)[name] = init.readbackStaysProtected ? null : value;
+        if (init.readbackStaysProtected) {
+          env._protected = { ...env._protected, [name]: true };
+        }
+      },
       async removeProductionEnv(name) {
         (env as Record<string, string | null>)[name] = null;
+        if (env._protected) {
+          const next = { ...env._protected };
+          delete next[name as keyof typeof next];
+          env._protected = Object.keys(next).length ? next : undefined;
+        }
       },
       async deployProduction() {
         state.deploys++;
@@ -179,10 +211,16 @@ describe("parseArgs", () => {
     expect(r).toMatchObject({ ok: true, command: "register", mint: "Abc", dryRun: true, yes: true });
     const p = parseArgs(["prepare", "--mint", "Def", "--dry-run", "--yes"]);
     expect(p).toMatchObject({ ok: true, command: "prepare", mint: "Def", dryRun: true, yes: true });
+    const rec = parseArgs(["recover-mint", "--mint", "Ghi", "--dry-run", "--yes"]);
+    expect(rec).toMatchObject({ ok: true, command: "recover-mint", mint: "Ghi", dryRun: true, yes: true });
   });
 
   test("prepare requires --mint", () => {
     expect(parseArgs(["prepare"]).ok).toBe(false);
+  });
+
+  test("recover-mint requires --mint", () => {
+    expect(parseArgs(["recover-mint"]).ok).toBe(false);
   });
 });
 
@@ -243,6 +281,205 @@ describe("protected mint status and overwrite refusal", () => {
     if (!result.ok) expect(result.error).toMatch(/protected|Refuse to overwrite/i);
     expect(h.sets).toEqual([]);
     expect(h.state.deploys).toBe(0);
+  });
+});
+
+describe("recover-mint", () => {
+  const homepagePrivate = "Official mint address coming soon. Token-holder scanning is not active yet.";
+
+  test("recovers protected mint as Config, readback matches, leaves publish/holder off", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+      homepage: homepagePrivate,
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_TOKEN_MINT" && s.value === mint)).toBe(true);
+    expect(h.sets.some((s) => s.name === "RED_MINT_PUBLIC" || s.name === "RED_HOLDER_SCANS_ENABLED")).toBe(false);
+    expect(h.env.RED_TOKEN_MINT).toBe(mint);
+    expect(h.env._protected?.RED_TOKEN_MINT).toBeUndefined();
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
+    expect(h.state.deploys).toBe(1);
+  });
+
+  test("refuses when existing mint is protected only after dirty-tree preflight", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      dirtyWorkingTree: true,
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/dirty/i);
+    expect(h.sets).toEqual([]);
+  });
+
+  test("refuses when publish or holder flags are enabled", async () => {
+    const mint = await sampleMint();
+    const published = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: "true",
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const pub = await cmdRecoverMint(published.deps, { mint, dryRun: true, yes: true });
+    expect(pub.ok).toBe(false);
+    if (!pub.ok) expect(pub.error).toMatch(/RED_MINT_PUBLIC is true/i);
+
+    const holders = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const hold = await cmdRecoverMint(holders.deps, { mint, dryRun: true, yes: true });
+    expect(hold.ok).toBe(false);
+    if (!hold.ok) expect(hold.error).toMatch(/RED_HOLDER_SCANS_ENABLED is true/i);
+  });
+
+  test("refuses incorrect / unreadable publish-holder flags", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true, RED_MINT_PUBLIC: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/RED_MINT_PUBLIC is unknown or protected/i);
+  });
+
+  test("reports partial recovery when Config add fails after env rm — no deploy, no success", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+      configAddFailsAfterRm: true,
+      homepage: homepagePrivate,
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/PARTIAL RECOVERY/i);
+      expect(result.error).toMatch(/Do not deploy/i);
+    }
+    expect(h.state.deploys).toBe(0);
+    expect(h.env.RED_TOKEN_MINT).toBeNull();
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
+  });
+
+  test("refuses readback mismatch / still-protected after Config write", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+      readbackStaysProtected: true,
+      homepage: homepagePrivate,
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Readback|protected|unreadable/i);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("reports deployment failure after successful Config write without flipping flags", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+      deployFails: true,
+      homepage: homepagePrivate,
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/recover-mint failed|deploy/i);
+    expect(h.env.RED_TOKEN_MINT).toBe(mint);
+    expect(h.env.RED_MINT_PUBLIC).toBeNull();
+    expect(h.env.RED_HOLDER_SCANS_ENABLED).toBeNull();
+  });
+
+  test("dry-run never mutates production", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      mintOnChain: { error: "account_absent" },
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("live on-chain mint requires Pump.fun verification", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: null,
+        RED_HOLDER_SCANS_ENABLED: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        _protected: { RED_TOKEN_MINT: true },
+      },
+      pumpOk: false,
+      homepage: homepagePrivate,
+    });
+    const result = await cmdRecoverMint(h.deps, { mint, dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Pump\.fun/i);
   });
 });
 

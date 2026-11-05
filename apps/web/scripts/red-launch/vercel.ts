@@ -207,6 +207,42 @@ export function createVercelClient(run: RunCommand = defaultRunCommand, git: Git
       }
     },
 
+    async replaceProductionEnvAsConfig(name, value) {
+      // Secrets cannot be converted in place — remove then add as Config.
+      await this.removeProductionEnv(name);
+      // From here, a failed add is partial recovery: mint is absent until Config is restored.
+
+      const base = [
+        "vercel",
+        "env",
+        "add",
+        name,
+        "--environment",
+        LAUNCH_ENVIRONMENT,
+        "--scope",
+        LAUNCH_TEAM,
+        "--project",
+        LAUNCH_PROJECT,
+        "--value",
+        value,
+        "--yes",
+      ];
+
+      const asType = await run([...base, "--type", "config"], { timeoutMs: 120_000 });
+      if (asType.code === 0) return;
+
+      const asFlag = await run([...base, "--no-sensitive"], { timeoutMs: 120_000 });
+      if (asFlag.code === 0) return;
+
+      const detail = redactSecrets(asType.stderr || asType.stdout || asFlag.stderr || asFlag.stdout);
+      const error = new Error(
+        `PARTIAL RECOVERY: removed Production ${name} but failed to re-add as Config. ${name} may now be ABSENT. Do not deploy. Do not publish or activate. Re-run recover-mint --mint <MINT> after fixing CLI/auth, or add ${name} as Config (--type config / --no-sensitive) in the Vercel dashboard for cope2/rednest Production. Detail: ${detail}`,
+      ) as Error & { partialRecovery: true; envName: string };
+      error.partialRecovery = true;
+      error.envName = name;
+      throw error;
+    },
+
     async deployProduction() {
       // Defense in depth — mutating commands must also call assertDeployableSource first.
       const revision = requireCleanApprovedRevision(await git.revision());

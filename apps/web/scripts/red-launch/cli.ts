@@ -5,6 +5,7 @@
  *
  *   bun run red:launch status
  *   bun run red:launch prepare --mint <RESERVED_MINT> [--dry-run] [--yes]
+ *   bun run red:launch recover-mint --mint <MINT> [--dry-run] [--yes]
  *   bun run red:launch register --mint <MINT> [--dry-run] [--yes]
  *   bun run red:launch publish [--dry-run] [--yes]
  *   bun run red:launch verify --eligible <W> --ineligible <W>
@@ -15,7 +16,16 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { join } from "node:path";
 import { parseArgs, usage } from "./args";
-import { cmdActivate, cmdDisable, cmdPrepare, cmdPublish, cmdRegister, cmdStatus, cmdVerify } from "./commands";
+import {
+  cmdActivate,
+  cmdDisable,
+  cmdPrepare,
+  cmdPublish,
+  cmdRecoverMint,
+  cmdRegister,
+  cmdStatus,
+  cmdVerify,
+} from "./commands";
 import { VERIFY_STATE_RELATIVE } from "./config";
 import { createPumpClient, createSolanaClient } from "./solana";
 import { createSiteClient } from "./site";
@@ -62,6 +72,9 @@ export async function runLaunch(argv: string[], deps: LaunchDeps = createDefault
       break;
     case "prepare":
       result = await cmdPrepare(deps, { mint: parsed.mint!, dryRun: parsed.dryRun, yes: parsed.yes });
+      break;
+    case "recover-mint":
+      result = await cmdRecoverMint(deps, { mint: parsed.mint!, dryRun: parsed.dryRun, yes: parsed.yes });
       break;
     case "register":
       result = await cmdRegister(deps, { mint: parsed.mint!, dryRun: parsed.dryRun, yes: parsed.yes });
