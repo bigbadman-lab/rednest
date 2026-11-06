@@ -82,8 +82,10 @@ export async function readMintDecimals(
 
 /**
  * Sums raw token amounts for `wallet` holding `mint` under `programId`.
- * Uses getParsedTokenAccountsByOwner(mint filter) so every token account for
- * that mint is included (ATA and non-ATA). Validates owner, mint and program.
+ * Uses getParsedTokenAccountsByOwner with the mint filter only — @solana/web3.js
+ * v3 rejects supplying both `mint` and `programId` ("Ambiguous token accounts
+ * filter"). Every returned account is still validated against `programId`
+ * (SPL Token or Token-2022 owner of the mint), including non-ATA accounts.
  */
 export async function sumMintBalance(
   rpc: RedBalanceRpc,
@@ -97,7 +99,8 @@ export async function sumMintBalance(
 
   let accounts: Awaited<ReturnType<RedBalanceRpc["getParsedTokenAccountsByOwner"]>>;
   try {
-    accounts = await rpc.getParsedTokenAccountsByOwner(wallet, { mint, programId });
+    // Mint-only filter is required for web3.js v3 Compatibility with Connection.
+    accounts = await rpc.getParsedTokenAccountsByOwner(wallet, { mint });
   } catch {
     return { error: "rpc_error" };
   }

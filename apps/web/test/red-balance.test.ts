@@ -56,8 +56,9 @@ describe("RED balance verification", () => {
       },
       async getParsedTokenAccountsByOwner(_owner, filter) {
         queriedProgram = filter.programId;
-        // Mint is SPL Token-owned: only that program is queried. Return ATA + non-ATA.
+        // Mint-only filter (web3.js v3 forbids mint+programId together).
         expect(filter.mint.equals(new PublicKey(mintPk))).toBe(true);
+        expect(filter.programId).toBeUndefined();
         return {
           value: [
             tokenAccount(mintPk, walletPk, (need / 2n).toString(), TOKEN_PROGRAM_ID, ata),
@@ -68,7 +69,7 @@ describe("RED balance verification", () => {
     };
 
     const at = await checkRedHolderBalance({ walletPubkey: walletPk, mint: mintPk, rpc });
-    expect(queriedProgram?.equals(TOKEN_PROGRAM_ID)).toBe(true);
+    expect(queriedProgram).toBeUndefined();
     expect(at).toMatchObject({ ok: true, eligible: true, decimals: 6 });
     if (at.ok) expect(at.rawAmount).toBe(need);
 
@@ -101,7 +102,8 @@ describe("RED balance verification", () => {
       },
       async getParsedTokenAccountsByOwner(_owner, filter) {
         calls += 1;
-        expect(filter.programId?.equals(TOKEN_2022_PROGRAM_ID)).toBe(true);
+        expect(filter.mint.equals(new PublicKey(mintPk))).toBe(true);
+        expect(filter.programId).toBeUndefined();
         return {
           value: [
             tokenAccount(mintPk, walletPk, (need / 4n).toString(), TOKEN_2022_PROGRAM_ID, a),
@@ -115,6 +117,48 @@ describe("RED balance verification", () => {
     expect(calls).toBe(1);
     expect(result).toMatchObject({ ok: true, eligible: true });
     if (result.ok) expect(result.rawAmount).toBe(need);
+  });
+
+  test("does not pass mint+programId together (web3.js v3 Ambiguous filter)", async () => {
+    const wallet = await Keypair.generate();
+    const mint = await Keypair.generate();
+    const walletPk = wallet.publicKey.toBase58();
+    const mintPk = mint.publicKey.toBase58();
+    const ata = (await Keypair.generate()).publicKey;
+
+    const rpc: RedBalanceRpc = {
+      async getParsedAccountInfo() {
+        return { value: { ...mintInfo(6), owner: TOKEN_2022_PROGRAM_ID } };
+      },
+      async getParsedTokenAccountsByOwner(_owner, filter) {
+        // Mirror @solana/web3.js@3 Connection behaviour.
+        if (filter.mint && filter.programId) {
+          throw new Error("Ambiguous token accounts filter. Supply exactly one of `mint` or `programId`.");
+        }
+        expect(filter.mint.equals(new PublicKey(mintPk))).toBe(true);
+        expect(filter.programId).toBeUndefined();
+        return { value: [tokenAccount(mintPk, walletPk, "0", TOKEN_2022_PROGRAM_ID, ata)] };
+      },
+    };
+
+    const result = await checkRedHolderBalance({ walletPubkey: walletPk, mint: mintPk, rpc });
+    expect(result).toMatchObject({ ok: true, eligible: false, wholeTokens: 0n });
+  });
+
+  test("probe wallet against a live Connection succeeds after mint-only filter", async () => {
+    // Regression for activate preflight: System Program owner + Token-2022 mint.
+    const { Connection } = await import("@solana/web3.js");
+    const rpcUrl = process.env.SOLANA_RPC_URL_TEST?.trim() || "https://api.mainnet-beta.solana.com";
+    const result = await checkRedHolderBalance({
+      walletPubkey: "11111111111111111111111111111111",
+      mint: "2jfBjJ2yVPmMugi4RHmMKbV1TbhYvXTLRq6iSaENpump",
+      rpcUrl,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.decimals).toBe(6);
+      expect(result.eligible).toBe(false);
+    }
   });
 
   test("fails closed on RPC errors and malformed mint or accounts", async () => {
