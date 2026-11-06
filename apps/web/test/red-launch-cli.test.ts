@@ -46,6 +46,8 @@ function createHarness(init: {
   mintOnChain?: MintOnChain | { error: string };
   pumpOk?: boolean;
   rpcProbeFails?: boolean;
+  /** Server-side preflight result when SOLANA_RPC_URL is protected. */
+  solanaPreflight?: { ok: true; mint: string; decimals: number; tokenProgram: "spl-token" | "token-2022" } | { ok: false; error: string };
   balances?: Record<string, { whole: bigint; eligible: boolean } | { error: string }>;
 }) {
   const env: EnvMap = {
@@ -190,7 +192,32 @@ function createHarness(init: {
         return { ok: init.healthOk !== false };
       },
       async homepageHtml() {
-        return init.homepage ?? "Official mint address coming soon. Token-holder scanning is not active yet.";
+        if (init.homepage !== undefined) return init.homepage;
+        const mint = typeof env.RED_TOKEN_MINT === "string" ? env.RED_TOKEN_MINT : null;
+        const published = env.RED_MINT_PUBLIC === "true" || Boolean(env._protected?.RED_MINT_PUBLIC && mint);
+        if (published && mint && !env._protected?.RED_MINT_PUBLIC) {
+          return `Official $NEST mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet.`;
+        }
+        // Protected publish without an explicit homepage stays unpublished (coming soon).
+        return "Official mint address coming soon. Token-holder scanning is not active yet.";
+      },
+      async solanaPreflight(mint) {
+        if (init.solanaPreflight) {
+          if (init.solanaPreflight.ok) {
+            return { ...init.solanaPreflight, mint, pumpFun: { verified: true as const, name: "NEST", symbol: "NEST" } };
+          }
+          return init.solanaPreflight;
+        }
+        if (init.rpcProbeFails) return { ok: false, error: "rpc_probe_failed:rpc_error" };
+        if (init.mintOnChain && "error" in init.mintOnChain) return { ok: false, error: init.mintOnChain.error };
+        if (init.pumpOk === false) return { ok: false, error: "pump_fun_unverified:not_found_on_pump_fun" };
+        return {
+          ok: true,
+          mint,
+          decimals: 6,
+          tokenProgram: "spl-token",
+          pumpFun: { verified: true, name: "NEST", symbol: "NEST" },
+        };
       },
     },
     io: {
@@ -1003,6 +1030,201 @@ describe("activate", () => {
     expect(result.ok).toBe(true);
     expect(h.logs.some((l) => /already true \(idempotent\)/.test(l))).toBe(true);
     expect(h.env.RED_HOLDER_SCANS_ENABLED).toBe("true");
+  });
+
+  test("names RED_TOKEN_MINT when mint is protected", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: null,
+        RED_MINT_PUBLIC: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: null,
+        _protected: { RED_TOKEN_MINT: true },
+      },
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/RED_TOKEN_MINT is protected/i);
+      expect(result.error).not.toMatch(/mint\/RPC\/publish/i);
+    }
+    expect(h.sets).toEqual([]);
+  });
+
+  test("protected unpublished RED_MINT_PUBLIC blocks activate and never treats [SENSITIVE] as true", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: null,
+        _protected: { RED_MINT_PUBLIC: true },
+      },
+      homepage: "Official mint address coming soon. Token-holder scanning is not active yet.",
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/RED_MINT_PUBLIC is protected/i);
+      expect(result.error).toMatch(/does not show the mint as published|Never treating \[SENSITIVE\]/i);
+    }
+    expect(h.sets).toEqual([]);
+    expect(h.state.deploys).toBe(0);
+  });
+
+  test("protected RED_MINT_PUBLIC allowed only when homepage verifiably shows the mint", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: null,
+        _protected: { RED_MINT_PUBLIC: true },
+      },
+      homepage: `Official $NEST mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet.`,
+      pumpOk: true,
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(true);
+    expect(h.logs.some((l) => /verified publication via production homepage/i.test(l))).toBe(true);
+    expect(h.sets).toEqual([]);
+  });
+
+  test("protected SOLANA_RPC_URL uses server-side preflight without reading the Secret", async () => {
+    const mint = await sampleMint();
+    const prev = process.env.SANDCHEST_ADMIN_TOKEN;
+    process.env.SANDCHEST_ADMIN_TOKEN = "test-operator-token-24chars-min";
+    try {
+      const h = createHarness({
+        env: {
+          RED_TOKEN_MINT: mint,
+          RED_MINT_PUBLIC: "true",
+          SOLANA_RPC_URL: null,
+          RED_HOLDER_SCANS_ENABLED: null,
+          _protected: { SOLANA_RPC_URL: true },
+        },
+        solanaPreflight: { ok: true, mint, decimals: 6, tokenProgram: "spl-token" },
+        pumpOk: true,
+      });
+      const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+      expect(result.ok).toBe(true);
+      expect(h.logs.some((l) => /server-side preflight|RPC Secret unread/i.test(l))).toBe(true);
+      expect(h.sets).toEqual([]);
+    } finally {
+      if (prev === undefined) delete process.env.SANDCHEST_ADMIN_TOKEN;
+      else process.env.SANDCHEST_ADMIN_TOKEN = prev;
+    }
+  });
+
+  test("protected RPC without operator token refuses activate", async () => {
+    const mint = await sampleMint();
+    const prev = process.env.SANDCHEST_ADMIN_TOKEN;
+    delete process.env.SANDCHEST_ADMIN_TOKEN;
+    try {
+      const h = createHarness({
+        env: {
+          RED_TOKEN_MINT: mint,
+          RED_MINT_PUBLIC: "true",
+          SOLANA_RPC_URL: null,
+          RED_HOLDER_SCANS_ENABLED: null,
+          _protected: { SOLANA_RPC_URL: true },
+        },
+      });
+      const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/SOLANA_RPC_URL is protected.*SANDCHEST_ADMIN_TOKEN/i);
+    } finally {
+      if (prev !== undefined) process.env.SANDCHEST_ADMIN_TOKEN = prev;
+    }
+  });
+
+  test("protected RPC preflight RPC failure blocks activation", async () => {
+    const mint = await sampleMint();
+    const prev = process.env.SANDCHEST_ADMIN_TOKEN;
+    process.env.SANDCHEST_ADMIN_TOKEN = "test-operator-token-24chars-min";
+    try {
+      const h = createHarness({
+        env: {
+          RED_TOKEN_MINT: mint,
+          RED_MINT_PUBLIC: "true",
+          SOLANA_RPC_URL: null,
+          RED_HOLDER_SCANS_ENABLED: null,
+          _protected: { SOLANA_RPC_URL: true },
+        },
+        solanaPreflight: { ok: false, error: "rpc_probe_failed:rpc_error" },
+      });
+      const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/rpc_probe_failed|Infrastructure/i);
+      expect(h.sets).toEqual([]);
+    } finally {
+      if (prev === undefined) delete process.env.SANDCHEST_ADMIN_TOKEN;
+      else process.env.SANDCHEST_ADMIN_TOKEN = prev;
+    }
+  });
+
+  test("activation before launch (unpublished mint) is rejected", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: null,
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: null,
+      },
+      homepage: "Official mint address coming soon. Token-holder scanning is not active yet.",
+    });
+    const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not published|RED_MINT_PUBLIC/i);
+    expect(h.sets).toEqual([]);
+  });
+
+  test("invalid Pump.fun mint still blocks when RPC is protected", async () => {
+    const mint = await sampleMint();
+    const prev = process.env.SANDCHEST_ADMIN_TOKEN;
+    process.env.SANDCHEST_ADMIN_TOKEN = "test-operator-token-24chars-min";
+    try {
+      const h = createHarness({
+        env: {
+          RED_TOKEN_MINT: mint,
+          RED_MINT_PUBLIC: "true",
+          SOLANA_RPC_URL: null,
+          RED_HOLDER_SCANS_ENABLED: null,
+          _protected: { SOLANA_RPC_URL: true },
+        },
+        solanaPreflight: { ok: false, error: "pump_fun_unverified:not_found_on_pump_fun" },
+      });
+      const result = await cmdActivate(h.deps, { dryRun: true, yes: true });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/pump_fun_unverified/i);
+    } finally {
+      if (prev === undefined) delete process.env.SANDCHEST_ADMIN_TOKEN;
+      else process.env.SANDCHEST_ADMIN_TOKEN = prev;
+    }
+  });
+
+  test("reports production deployment failure after holder flag write", async () => {
+    const mint = await sampleMint();
+    const h = createHarness({
+      env: {
+        RED_TOKEN_MINT: mint,
+        RED_MINT_PUBLIC: "true",
+        SOLANA_RPC_URL: "https://rpc.test",
+        RED_HOLDER_SCANS_ENABLED: null,
+      },
+      deployFails: true,
+      pumpOk: true,
+    });
+    const result = await cmdActivate(h.deps, { dryRun: false, yes: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Activate failed|deploy/i);
+    expect(h.sets.some((s) => s.name === "RED_HOLDER_SCANS_ENABLED" && s.value === "true")).toBe(true);
+    expect(h.env.RED_MINT_PUBLIC).toBe("true");
+    expect(h.env.RED_TOKEN_MINT).toBe(mint);
   });
 });
 

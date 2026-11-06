@@ -781,32 +781,118 @@ export async function cmdVerify(
   return { ok: true, code: 0 };
 }
 
-export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
-  const blocked = await requireTarget(deps);
-  if (blocked) return blocked;
-  const dirty = await requireCleanSource(deps);
-  if (dirty) return dirty;
-
-  const env = await deps.vercel.readProductionEnv();
-  const mintState = envKeyState(env, "RED_TOKEN_MINT");
-  const rpcState = envKeyState(env, "SOLANA_RPC_URL");
-  const publishedState = envKeyState(env, "RED_MINT_PUBLIC");
-  if (mintState === "protected" || rpcState === "protected" || publishedState === "protected") {
-    return { ok: false, code: 2, error: "Production mint/RPC/publish config is protected; refuse to activate without a readable Config value." };
+/**
+ * Publication must be verifiably true. Never treat a protected [SENSITIVE]
+ * placeholder as true — confirm via the live homepage when the flag is Secret.
+ */
+async function requirePublishedMint(
+  deps: LaunchDeps,
+  env: EnvMap,
+  mint: string,
+): Promise<CommandResult | null> {
+  const state = envKeyState(env, "RED_MINT_PUBLIC");
+  if (state === "unknown") {
+    return { ok: false, code: 2, error: "RED_MINT_PUBLIC is unknown; refuse to activate." };
   }
-  const mintRaw = envValue(env, "RED_TOKEN_MINT");
-  const rpc = envValue(env, "SOLANA_RPC_URL");
+  if (state === "protected") {
+    let html: string;
+    try {
+      html = await deps.site.homepageHtml();
+    } catch (error) {
+      return {
+        ok: false,
+        code: 2,
+        error: `RED_MINT_PUBLIC is protected; homepage verification failed (${error instanceof Error ? error.message : String(error)}). Refuse to activate.`,
+      };
+    }
+    if (!homepageShowsMint(html, mint) || !homepageSolscanFor(html, mint)) {
+      return {
+        ok: false,
+        code: 2,
+        error:
+          "RED_MINT_PUBLIC is protected (not readable via CLI) and the production homepage does not show the mint as published. Rematerialize RED_MINT_PUBLIC as Config or run publish before activate. Never treating [SENSITIVE] as true.",
+      };
+    }
+    deps.io.log("RED_MINT_PUBLIC is protected; verified publication via production homepage (mint + Solscan visible).");
+    return null;
+  }
+
   const published = flagPresence(envValue(env, "RED_MINT_PUBLIC"));
-  if (mintRaw === undefined || rpc === undefined || published === "unknown") {
-    return { ok: false, code: 2, error: "Production config unknown; refuse to activate." };
+  if (published !== "true") {
+    return { ok: false, code: 2, error: "Mint is not published (RED_MINT_PUBLIC≠true). Refuse to activate before launch publication." };
   }
-  const mint = mintRaw ? canonicalSolanaPubkey(mintRaw) : null;
-  if (!mint) return { ok: false, code: 2, error: "Canonical mint is not registered." };
-  if (published !== "true") return { ok: false, code: 2, error: "Mint is not published (RED_MINT_PUBLIC≠true)." };
-  if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured." };
 
-  const health = await deps.site.health();
-  if (!health.ok) return { ok: false, code: 2, error: "Production health check failed." };
+  // Readable true still cross-checks the live site — fail closed on drift.
+  try {
+    const html = await deps.site.homepageHtml();
+    if (!homepageShowsMint(html, mint)) {
+      return {
+        ok: false,
+        code: 2,
+        error: "RED_MINT_PUBLIC is true but the production homepage does not show the mint. Refuse to activate until publication is consistent.",
+      };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      code: 2,
+      error: `Homepage verification failed after readable RED_MINT_PUBLIC=true (${error instanceof Error ? error.message : String(error)}).`,
+    };
+  }
+  return null;
+}
+
+async function requireActivateInfrastructure(
+  deps: LaunchDeps,
+  env: EnvMap,
+  mint: string,
+): Promise<CommandResult | { ok: true; detail: string }> {
+  const rpcState = envKeyState(env, "SOLANA_RPC_URL");
+  if (rpcState === "unknown") {
+    return { ok: false, code: 2, error: "SOLANA_RPC_URL is unknown; refuse to activate." };
+  }
+  if (rpcState === "absent") {
+    return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured." };
+  }
+
+  if (rpcState === "protected") {
+    const token = process.env.SANDCHEST_ADMIN_TOKEN?.trim() || "";
+    if (!token) {
+      return {
+        ok: false,
+        code: 2,
+        error:
+          "SOLANA_RPC_URL is protected. Set SANDCHEST_ADMIN_TOKEN in the local environment (never commit it) so activate can call the authenticated production Solana preflight without reading the RPC Secret.",
+      };
+    }
+    const preflight = await deps.site.solanaPreflight(mint, token);
+    if (!preflight.ok) {
+      if (preflight.error === "account_absent") {
+        return {
+          ok: false,
+          code: 2,
+          error: "Activation rejected: on-chain mint account does not exist yet (create the Pump.fun token first).",
+        };
+      }
+      if (preflight.error === "not_a_mint") {
+        return { ok: false, code: 2, error: "Activation rejected: registered address is not a mint account." };
+      }
+      if (preflight.error.startsWith("pump_fun_unverified")) {
+        return { ok: false, code: 2, error: `Activation prerequisites failed: ${preflight.error}` };
+      }
+      if (preflight.error.startsWith("rpc_probe_failed") || preflight.error === "rpc_error" || preflight.error === "rpc_unconfigured") {
+        return { ok: false, code: 2, error: `Holder infrastructure check failed: ${preflight.error}` };
+      }
+      return { ok: false, code: 2, error: `Production Solana preflight failed: ${preflight.error}` };
+    }
+    return {
+      ok: true,
+      detail: `Infrastructure OK (server-side preflight; RPC Secret unread): mint=${preflight.mint} decimals=${preflight.decimals} program=${preflight.tokenProgram}; pump.fun verified; RPC balance queries succeed.`,
+    };
+  }
+
+  const rpc = envValue(env, "SOLANA_RPC_URL");
+  if (!rpc) return { ok: false, code: 2, error: "SOLANA_RPC_URL is not configured." };
 
   const inspected = await requireVerifiedPumpMint(deps.solana, deps.pump, mint, rpc);
   if ("error" in inspected) {
@@ -827,9 +913,48 @@ export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; ye
   if (!probe.ok) {
     return { ok: false, code: 2, error: `Holder infrastructure check failed: ${probe.error}` };
   }
-  deps.io.log(
-    `Infrastructure OK: mint=${inspected.mint} decimals=${inspected.decimals} program=${inspected.tokenProgram}; pump.fun verified; RPC balance queries succeed.`,
-  );
+  return {
+    ok: true,
+    detail: `Infrastructure OK: mint=${inspected.mint} decimals=${inspected.decimals} program=${inspected.tokenProgram}; pump.fun verified; RPC balance queries succeed.`,
+  };
+}
+
+export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; yes: boolean }): Promise<CommandResult> {
+  const blocked = await requireTarget(deps);
+  if (blocked) return blocked;
+  const dirty = await requireCleanSource(deps);
+  if (dirty) return dirty;
+
+  const env = await deps.vercel.readProductionEnv();
+  const mintState = envKeyState(env, "RED_TOKEN_MINT");
+  if (mintState === "protected") {
+    return {
+      ok: false,
+      code: 2,
+      error:
+        "RED_TOKEN_MINT is protected (not readable via CLI). Refuse to activate — rematerialize as Config with recover-mint before activation.",
+    };
+  }
+  if (mintState === "unknown") {
+    return { ok: false, code: 2, error: "RED_TOKEN_MINT is unknown; refuse to activate." };
+  }
+  if (mintState === "absent") {
+    return { ok: false, code: 2, error: "Canonical mint is not registered." };
+  }
+
+  const mintRaw = envValue(env, "RED_TOKEN_MINT");
+  const mint = mintRaw ? canonicalSolanaPubkey(mintRaw) : null;
+  if (!mint) return { ok: false, code: 2, error: "Canonical mint is not registered." };
+
+  const publishedGate = await requirePublishedMint(deps, env, mint);
+  if (publishedGate) return publishedGate;
+
+  const health = await deps.site.health();
+  if (!health.ok) return { ok: false, code: 2, error: "Production health check failed." };
+
+  const infra = await requireActivateInfrastructure(deps, env, mint);
+  if (!("detail" in infra)) return infra;
+  deps.io.log(infra.detail);
 
   if (flagPresence(envValue(env, "RED_HOLDER_SCANS_ENABLED")) === "true") {
     deps.io.log("RED_HOLDER_SCANS_ENABLED already true (idempotent).");
@@ -864,7 +989,11 @@ export async function cmdActivate(deps: LaunchDeps, input: { dryRun: boolean; ye
     deps.io.log("Note: end-to-end chargeable scan authorization was not tested by this CLI.");
     return { ok: true, code: 0 };
   } catch (error) {
-    return { ok: false, code: 4, error: `Activate failed: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      ok: false,
+      code: 4,
+      error: `Activate failed: ${error instanceof Error ? error.message : String(error)}. Inspect RED_HOLDER_SCANS_ENABLED and the latest production deployment before retrying.`,
+    };
   }
 }
 

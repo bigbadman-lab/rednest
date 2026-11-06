@@ -100,9 +100,25 @@ export type PumpClient = {
   lookupCoin(mint: string): Promise<{ ok: true; name?: string; symbol?: string } | { ok: false; reason: string }>;
 };
 
+/** Coarse production Solana preflight — never includes RPC URLs or credentials. */
+export type SolanaPreflightResult =
+  | {
+      ok: true;
+      mint: string;
+      decimals: number;
+      tokenProgram: "spl-token" | "token-2022";
+      pumpFun: { verified: true; name?: string; symbol?: string };
+    }
+  | { ok: false; error: string };
+
 export type SiteClient = {
   health(): Promise<{ ok: boolean; body?: string }>;
   homepageHtml(): Promise<string>;
+  /**
+   * Authenticated production probe when SOLANA_RPC_URL is a Secret.
+   * Uses SANDCHEST_ADMIN_TOKEN; never logs the token or RPC URL.
+   */
+  solanaPreflight(mint: string, operatorToken: string): Promise<SolanaPreflightResult>;
 };
 
 export type LaunchIO = {
