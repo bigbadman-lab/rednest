@@ -16,4 +16,5 @@ export const ENV_RPC = "SOLANA_RPC_URL";
 /** Local verification receipt — never stores RPC URLs or API keys. */
 export const VERIFY_STATE_RELATIVE = ".red-launch/verify-result.json";
 
+/** Optional metadata enrichment only — provenance is on-chain bonding-curve PDA. */
 export const PUMP_COIN_URL = (mint: string) => `https://frontend-api-v3.pump.fun/coins-v2/${mint}`;

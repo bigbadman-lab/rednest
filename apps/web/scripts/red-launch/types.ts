@@ -34,7 +34,16 @@ export type MintOnChain = {
 };
 
 export type MintInspection = MintOnChain & {
-  pumpFun: { verified: true; name?: string; symbol?: string } | { verified: false; reason: string };
+  pumpFun:
+    | {
+        verified: true;
+        name?: string;
+        symbol?: string;
+        bondingCurve?: string;
+        complete?: boolean;
+        source: "on_chain_bonding_curve";
+      }
+    | { verified: false; reason: string };
 };
 
 export type VerifyReceipt = {
@@ -97,7 +106,24 @@ export type SolanaClient = {
 };
 
 export type PumpClient = {
-  lookupCoin(mint: string): Promise<{ ok: true; name?: string; symbol?: string } | { ok: false; reason: string }>;
+  /**
+   * Verify Pump.fun provenance for a mint. Primary evidence is the on-chain
+   * bonding-curve PDA; HTTP metadata is optional enrichment only.
+   */
+  verifyMint(
+    mint: string,
+    rpcUrl: string,
+  ): Promise<
+    | {
+        ok: true;
+        name?: string;
+        symbol?: string;
+        bondingCurve: string;
+        complete: boolean;
+        source: "on_chain_bonding_curve";
+      }
+    | { ok: false; reason: string }
+  >;
 };
 
 /** Coarse production Solana preflight — never includes RPC URLs or credentials. */
@@ -107,7 +133,14 @@ export type SolanaPreflightResult =
       mint: string;
       decimals: number;
       tokenProgram: "spl-token" | "token-2022";
-      pumpFun: { verified: true; name?: string; symbol?: string };
+      pumpFun: {
+        verified: true;
+        name?: string;
+        symbol?: string;
+        bondingCurve?: string;
+        complete?: boolean;
+        source: "on_chain_bonding_curve";
+      };
     }
   | { ok: false; error: string };
 

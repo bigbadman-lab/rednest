@@ -182,9 +182,16 @@ function createHarness(init: {
       },
     },
     pump: {
-      async lookupCoin() {
+      async verifyMint() {
         if (init.pumpOk === false) return { ok: false, reason: "not_found_on_pump_fun" };
-        return { ok: true, name: "NEST", symbol: "NEST" };
+        return {
+          ok: true,
+          name: "NEST",
+          symbol: "NEST",
+          bondingCurve: "BondingCurve1111111111111111111111111111111",
+          complete: false,
+          source: "on_chain_bonding_curve" as const,
+        };
       },
     },
     site: {
@@ -204,19 +211,37 @@ function createHarness(init: {
       async solanaPreflight(mint) {
         if (init.solanaPreflight) {
           if (init.solanaPreflight.ok) {
-            return { ...init.solanaPreflight, mint, pumpFun: { verified: true as const, name: "NEST", symbol: "NEST" } };
+            return {
+              ...init.solanaPreflight,
+              mint,
+              pumpFun: {
+                verified: true as const,
+                name: "NEST",
+                symbol: "NEST",
+                bondingCurve: "BondingCurve1111111111111111111111111111111",
+                complete: false,
+                source: "on_chain_bonding_curve" as const,
+              },
+            };
           }
           return init.solanaPreflight;
         }
         if (init.rpcProbeFails) return { ok: false, error: "rpc_probe_failed:rpc_error" };
         if (init.mintOnChain && "error" in init.mintOnChain) return { ok: false, error: init.mintOnChain.error };
-        if (init.pumpOk === false) return { ok: false, error: "pump_fun_unverified:not_found_on_pump_fun" };
+        if (init.pumpOk === false) return { ok: false, error: "pump_fun_unverified:bonding_curve_absent" };
         return {
           ok: true,
           mint,
           decimals: 6,
           tokenProgram: "spl-token",
-          pumpFun: { verified: true, name: "NEST", symbol: "NEST" },
+          pumpFun: {
+            verified: true,
+            name: "NEST",
+            symbol: "NEST",
+            bondingCurve: "BondingCurve1111111111111111111111111111111",
+            complete: false,
+            source: "on_chain_bonding_curve",
+          },
         };
       },
     },

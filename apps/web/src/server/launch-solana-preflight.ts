@@ -2,6 +2,9 @@
  * Server-side Solana preflight for launch activation when SOLANA_RPC_URL is a
  * Vercel Secret ([SENSITIVE] on CLI pull). Uses the runtime RPC from env and
  * never returns the URL or credentials.
+ *
+ * Pump.fun identity is verified via the on-chain bonding-curve PDA, not the
+ * bot-gated frontend HTTP API.
  */
 import { Connection, PublicKey } from "@solana/web3.js";
 import {
@@ -10,12 +13,11 @@ import {
   checkRedHolderBalance,
   readMintDecimals,
 } from "./solana/red-balance";
+import { verifyPumpFunProvenance } from "./solana/pump-provenance";
 import { canonicalSolanaPubkey } from "./solana/pubkey";
 
 /** Same throwaway wallet the launch CLI uses for getParsedTokenAccountsByOwner. */
 const RPC_PROBE_WALLET = "11111111111111111111111111111111";
-
-const PUMP_COIN_URL = (mint: string) => `https://frontend-api-v3.pump.fun/coins-v2/${mint}`;
 
 export type LaunchSolanaPreflight =
   | {
@@ -23,14 +25,20 @@ export type LaunchSolanaPreflight =
       mint: string;
       decimals: number;
       tokenProgram: "spl-token" | "token-2022";
-      pumpFun: { verified: true; name?: string; symbol?: string };
+      pumpFun: {
+        verified: true;
+        name?: string;
+        symbol?: string;
+        bondingCurve?: string;
+        complete?: boolean;
+        source: "on_chain_bonding_curve";
+      };
     }
   | { ok: false; error: string };
 
 export async function runLaunchSolanaPreflight(
   expectedMint: string,
   env: Record<string, string | undefined> = process.env,
-  fetchImpl: typeof fetch = fetch,
 ): Promise<LaunchSolanaPreflight> {
   const mint = canonicalSolanaPubkey(expectedMint);
   if (!mint) return { ok: false, error: "invalid_mint" };
@@ -68,23 +76,9 @@ export async function runLaunchSolanaPreflight(
   });
   if (!probe.ok) return { ok: false, error: `rpc_probe_failed:${probe.reason}` };
 
-  let pumpName: string | undefined;
-  let pumpSymbol: string | undefined;
-  try {
-    const res = await fetchImpl(PUMP_COIN_URL(mint), {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (res.status === 404) return { ok: false, error: "pump_fun_unverified:not_found_on_pump_fun" };
-    if (!res.ok) return { ok: false, error: `pump_fun_unverified:pump_api_http_${res.status}` };
-    const body = (await res.json()) as { mint?: string; name?: string; symbol?: string };
-    const bodyMint = typeof body.mint === "string" ? canonicalSolanaPubkey(body.mint) : null;
-    if (!bodyMint || bodyMint !== mint) return { ok: false, error: "pump_fun_unverified:pump_mint_mismatch" };
-    pumpName = body.name;
-    pumpSymbol = body.symbol;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "network_error";
-    return { ok: false, error: `pump_fun_unverified:pump_unreachable:${message}` };
+  const provenance = await verifyPumpFunProvenance(connection, mint);
+  if (!provenance.verified) {
+    return { ok: false, error: `pump_fun_unverified:${provenance.reason}` };
   }
 
   return {
@@ -92,6 +86,11 @@ export async function runLaunchSolanaPreflight(
     mint,
     decimals: meta.decimals,
     tokenProgram,
-    pumpFun: { verified: true, name: pumpName, symbol: pumpSymbol },
+    pumpFun: {
+      verified: true,
+      bondingCurve: provenance.bondingCurve,
+      complete: provenance.complete,
+      source: "on_chain_bonding_curve",
+    },
   };
 }
