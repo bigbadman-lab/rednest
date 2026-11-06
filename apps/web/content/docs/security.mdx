@@ -33,7 +33,7 @@ RedNest adds no account, repository, organization or user identifiers to prompts
 | Each sign-in session, with your browser's user agent | To keep you signed in |
 | Your GitHub sign-in token, encrypted | To check which repositories you can access |
 | API keys and agents' OAuth tokens, as SHA-256 hashes only, with each one's name and when it was last used | To let your agents act as you, and show them in Settings |
-| Verified Solana wallet bindings (public key and verification timestamps) | To support planned $NEST holder eligibility |
+| Verified Solana wallet bindings (public key and verification timestamps) | To support $NEST holder eligibility |
 | Entitlement usage (free scan and monthly holder quotas) | To enforce scan allowances |
 | Legacy billing state, when that module is enabled for an account | Historical credits/plan data for accounts that still use it |
 
@@ -80,7 +80,7 @@ RedNest never writes to your code and never opens issues.
 - **Finding emails** cover new critical findings and finished deep scans. They go to people who have signed in and had push access to the repository when RedNest last checked, within the past 30 days. An admin can turn these emails off for the account in [Settings](/dashboard/settings).
 - **Operational emails** go to account admins when a scan stops because the model provider refused it, and (when the legacy credits module is enabled) when credits run low or an auto top-up fails. Admins are people GitHub confirmed as admins in the last 30 days; if there are none, RedNest asks GitHub before sending.
 - There is no marketing email.
-- **Public hosted access** does not require a fiat subscription for the free scan or planned $NEST holder model. Legacy card billing, when enabled for an account, is processed by Stripe through Autumn; RedNest never sees card numbers.
+- **Public hosted access** does not require a fiat subscription for the free scan or $NEST holder model. Legacy card billing, when enabled for an account, is processed by Stripe through Autumn; RedNest never sees card numbers.
 
 The list of subprocessors that handle data for the hosted service is available on request from the contact address in the [Privacy policy](/privacy#contact).
 

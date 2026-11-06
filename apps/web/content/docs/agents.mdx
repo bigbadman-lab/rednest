@@ -5,7 +5,7 @@ description: Connect Claude Code, Cursor, Codex or any agent over MCP or HTTP to
 
 Anything you can do in the dashboard, your agent can do for you: connect, install guidance, start deep scans, read findings and change settings. You only step in where a person has to: approving the agent once and installing the GitHub App when needed.
 
-Hosted access uses **one lifetime free scan** per GitHub account. **$NEST holder scanning is not active yet.** Do not assume payment, credit packs or holder eligibility are available. See [Pricing & $NEST access](/docs/pricing).
+Hosted access uses **one lifetime free scan** per GitHub account, then **$NEST holder access** for eligible verified wallets. Do not assume payment or credit packs are available. See [Pricing & $NEST access](/docs/pricing).
 
 ## The quickest way
 
@@ -25,7 +25,7 @@ Then call get_me and work through next_steps. Only ask me for what needs me: app
 4. **Scan.** Prefer `start_deep_scan` when the account is ready. The first chargeable scan for that GitHub user may use the lifetime free entitlement. Do not assume Stripe checkout or credit packs are required for that free scan.
 5. **Fix.** In a checkout, `get_findings_prompt` (or `get_fix_prompt`) gives fix prompts. When the fix reaches the default branch, RedNest re-checks open findings.
 
-Wallet verification for planned $NEST holder access is done in the browser under [Settings](/dashboard/settings#wallet), not through a token transfer API.
+Wallet verification for $NEST holder access is done in the browser under [Settings](/dashboard/settings#wallet), not through a token transfer API.
 
 ## Connect over MCP
 
@@ -102,7 +102,7 @@ Every tool is also an HTTP endpoint under `https://rednest.tech/api/v1`. `GET /a
 | `update_finding` | `PATCH /findings/{id}` | Dismiss, mark fixed, or reopen |
 | `get_overview` | `GET /overview` | Reviews, scans, findings and fixes over time |
 
-Legacy billing tools (`get_billing`, `quote_credits`, `buy_credits`, `claim_free_credits`, and related) may still appear in the OpenAPI surface for accounts that use the older credits module. They are **not** the public $NEST access model. Prefer free-scan / future holder entitlements described in [Pricing](/docs/pricing).
+Legacy billing tools (`get_billing`, `quote_credits`, `buy_credits`, `claim_free_credits`, and related) may still appear in the OpenAPI surface for accounts that use the older credits module. They are **not** the public $NEST access model. Prefer free-scan / holder entitlements described in [Pricing](/docs/pricing).
 
 ## Errors
 
@@ -117,4 +117,4 @@ Errors come back as `{"error": {"code": "…", "message": "…"}}`. Codes to act
 | 409 | `already_running` | Follow the running scan (`scan_id`). |
 | 422 | `invalid_input` | See `issues` for fields. |
 
-If a scan is refused for entitlement reasons, tell the person to check [Pricing](/docs/pricing) and [Settings](/dashboard/settings) (free scan used, wallet not verified, or holder scanning not active yet).
+If a scan is refused for entitlement reasons, tell the person to check [Pricing](/docs/pricing) and [Settings](/dashboard/settings) (free scan used, wallet not verified, insufficient $NEST, or monthly holder quota exhausted).

@@ -138,7 +138,7 @@ function appendRedNestAccessSteps(access: AccessSnapshot, appUrl: string, steps:
   if (!access.holder_access_active || access.holder_status === "not_activated" || access.holder_status === "unavailable") {
     steps.push({
       step: "holder_access_inactive",
-      do: "The lifetime free scan is used. $NEST holder scanning is not active yet, so further chargeable scans are not available. Do not ask for payment or credits. Optional: the person can verify a Solana wallet in Settings ahead of launch.",
+      do: "The lifetime free scan is used and $NEST holder access is not available for this account right now (holder scanning inactive or unavailable). Do not ask for payment or credits. Ask the person to check Settings and Pricing; they can verify a Solana wallet holding at least 50,000 $NEST when holder access is enabled.",
       url: walletUrl,
     });
     return;

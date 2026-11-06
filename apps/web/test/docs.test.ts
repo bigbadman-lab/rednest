@@ -1,6 +1,6 @@
 /**
  * Docs and legal pages: structure, internal links, and public pricing copy
- * that must match the RedNest free-scan + planned $NEST holder model.
+ * that must match the RedNest free-scan + $NEST holder model.
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -26,8 +26,8 @@ describe("pricing matches the $NEST access model", () => {
     expect(pricing).toContain("50 scans per UTC month");
     expect(pricing).toContain("50,000 $NEST");
     expect(pricing).toContain("[Connect Wallet](/dashboard/settings#wallet)");
-    expect(pricing).toContain("Token-holder scanning is not active yet");
-    expect(pricing).toContain("No official mint is configured");
+    expect(pricing).toContain("Token-holder scanning is enabled");
+    expect(pricing).toContain("RedNest does not sell $NEST");
   });
 
   test("does not advertise SaaS subscription prices", () => {
@@ -181,8 +181,9 @@ describe("what the pages must never say", () => {
     }
   });
 
-  test("public pricing does not claim the token has launched", () => {
-    expect(doc("pricing")).toContain("not active yet");
-    expect(doc("pricing")).not.toMatch(/\blaunched\b.*\$NEST|\$NEST is (live|tradable|available to buy)/i);
+  test("public pricing states holder scanning is enabled without selling $NEST", () => {
+    expect(doc("pricing")).toContain("Token-holder scanning is enabled");
+    expect(doc("pricing")).toContain("RedNest does not sell $NEST");
+    expect(doc("pricing")).not.toMatch(/\$NEST is (tradable|available to buy)/i);
   });
 });

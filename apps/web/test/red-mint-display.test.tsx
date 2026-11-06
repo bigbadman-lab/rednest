@@ -5,6 +5,8 @@ import {
   FREE_ACCESS_SUMMARY,
   GET_STARTED_READY_LEAD,
   HOLDER_ACCESS_SUMMARY,
+  HOLDER_ACCESS_TITLE_ACTIVE,
+  HOLDER_ACCESS_TITLE_INACTIVE,
   HOLDER_STATUS_INACTIVE,
   MINT_COMING_SOON,
   TOKEN_NOT_LAUNCHED,
@@ -94,7 +96,7 @@ describe("RedAccessSectionView", () => {
     expect(html).toContain(HOLDER_ACCESS_SUMMARY);
     expect(html).toContain("50,000 $NEST");
     expect(html).toContain("50 scans per UTC month");
-    expect(html).toContain("$NEST holder access — coming soon");
+    expect(html).toContain(HOLDER_ACCESS_TITLE_INACTIVE);
     expect(html).toContain(HOLDER_STATUS_INACTIVE);
     expect(html).toContain(MINT_COMING_SOON);
     expect(html).not.toContain('data-testid="red-mint-address"');
@@ -132,15 +134,19 @@ describe("RedAccessSectionView", () => {
       />,
     );
     expect(html).toContain(SAMPLE_MINT);
+    expect(html).toContain(HOLDER_ACCESS_TITLE_ACTIVE);
+    expect(html).not.toContain(HOLDER_ACCESS_TITLE_INACTIVE);
     expect(html).not.toContain(TOKEN_NOT_LAUNCHED);
   });
 
   test("holder-active status copy does not appear unless the launch flag is on", () => {
     const off = renderToStaticMarkup(<RedAccessSectionView published={false} holdersActive={false} />);
     expect(off).not.toContain("Token-holder scanning is enabled");
+    expect(off).toContain(HOLDER_ACCESS_TITLE_INACTIVE);
 
     const on = renderToStaticMarkup(<RedAccessSectionView published={false} holdersActive />);
     expect(on).toContain("Token-holder scanning is enabled for eligible verified wallets.");
+    expect(on).toContain(HOLDER_ACCESS_TITLE_ACTIVE);
   });
 });
 

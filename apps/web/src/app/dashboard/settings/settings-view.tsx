@@ -72,12 +72,12 @@ export function SettingsView({
             <div>
               <p className="field-legend">Scan access</p>
               <p className="field-help">
-                Hosted RedNest uses one lifetime free scan per GitHub account, then planned $NEST holder access (50 scans per
-                UTC month when activated).{" "}
+                Hosted RedNest uses one lifetime free scan per GitHub account, then $NEST holder access (50 scans per UTC month
+                for eligible verified wallets holding at least 50,000 $NEST).{" "}
                 <Link className="quiet" href="/docs/pricing">
                   Pricing &amp; $NEST access
                 </Link>
-                . Connect a wallet below when you are ready; holder scanning is not active yet.
+                . Connect a wallet below to unlock holder scans after your free scan.
               </p>
             </div>
             {billing && <BillingPanel org={org} billing={billing[index] ?? null} />}

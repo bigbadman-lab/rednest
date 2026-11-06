@@ -1,11 +1,11 @@
 ---
 title: Pricing & $NEST access
-description: One lifetime free scan per GitHub account, then planned $NEST holder access of 50 scans per UTC month. No recurring fiat subscription for holder scans.
+description: One lifetime free scan per GitHub account, then $NEST holder access of 50 scans per UTC month. No recurring fiat subscription for holder scans.
 ---
 
-RedNest access is based on GitHub identity and, after launch, verified $NEST holdings. There is no monthly or annual SaaS subscription required for the public $NEST holder model.
+RedNest access is based on GitHub identity and verified $NEST holdings. There is no monthly or annual SaaS subscription required for the public $NEST holder model.
 
-> **Token-holder scanning is not active yet.** Wallet verification is available ahead of the official $NEST launch. No official mint is configured, and RedNest does not sell $NEST.
+> **Token-holder scanning is enabled.** Connect a verified Solana wallet holding at least 50,000 $NEST to unlock monthly holder scans after your free lifetime scan. RedNest does not sell $NEST; the official mint is shown on the [home page](/).
 
 ## Start scanning for free
 
@@ -20,7 +20,7 @@ RedNest access is based on GitHub identity and, after launch, verified $NEST hol
 
 ## Security scanning powered by $NEST
 
-**Allowance:** 50 scans per UTC month after activation.  
+**Allowance:** 50 scans per UTC month.  
 **Eligibility:** Hold at least **50,000 $NEST** in a cryptographically verified Solana wallet.
 
 - Connect a Solana wallet in [Settings](/dashboard/settings#wallet).
@@ -31,7 +31,7 @@ RedNest access is based on GitHub identity and, after launch, verified $NEST hol
 
 [Connect Wallet](/dashboard/settings#wallet)
 
-Token-holder scanning is not active yet. Wallet verification is available ahead of the official $NEST launch.
+Token-holder scanning is enabled for eligible verified wallets. See the official mint on the [home page](/).
 
 ## What uses a scan allowance
 
@@ -44,16 +44,16 @@ One authorized scan allowance is charged for each of:
 
 Accounting follows RedNest’s reservation and settlement rules: an allowance is reserved when a chargeable scan is authorized, then settled when the scan meaningfully starts. A scan that fails, is refused, or never starts does **not** permanently consume that allowance in the usual settlement path. Recon (threat-model mapping) and fix checks are not charged as holder scan allowances.
 
-Organizations can designate a **sponsor** whose allowance funds automatic pull request reviews. Scan allowances are not unlimited: free users get one lifetime scan, and eligible holders get at most 50 chargeable scans per UTC month after activation.
+Organizations can designate a **sponsor** whose allowance funds automatic pull request reviews. Scan allowances are not unlimited: free users get one lifetime scan, and eligible holders get at most 50 chargeable scans per UTC month.
 
 ## How holder eligibility works
 
 1. GitHub remains your RedNest identity.
 2. You verify a Solana wallet with a signed message ([Solana wallet verification](/docs/wallet)).
-3. When holder scanning is activated, RedNest checks the verified wallet’s on-chain $NEST balance against the 50,000 whole-token threshold before reserving a holder scan.
+3. RedNest checks the verified wallet’s on-chain $NEST balance against the 50,000 whole-token threshold before reserving a holder scan.
 4. Client-reported balances are never trusted.
 
-Until activation, missing mint configuration or a disabled launch flag keeps holder access fail-closed. Your free lifetime scan and GitHub sign-in continue to work.
+If mint configuration or the holder-scan flag is missing, holder access stays fail-closed. Your free lifetime scan and GitHub sign-in continue to work.
 
 ## Self-hosted
 

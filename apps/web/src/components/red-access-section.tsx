@@ -3,6 +3,8 @@ import { MintAddress } from "@/components/mint-address";
 import {
   FREE_ACCESS_SUMMARY,
   HOLDER_ACCESS_SUMMARY,
+  HOLDER_ACCESS_TITLE_ACTIVE,
+  HOLDER_ACCESS_TITLE_INACTIVE,
   HOLDER_STATUS_ACTIVE,
   HOLDER_STATUS_INACTIVE,
   MINT_COMING_SOON,
@@ -56,7 +58,7 @@ export function RedAccessSectionView({
           <span>{FREE_ACCESS_SUMMARY}</span>
         </li>
         <li>
-          <strong>$NEST holder access — coming soon</strong>
+          <strong>{holdersActive ? HOLDER_ACCESS_TITLE_ACTIVE : HOLDER_ACCESS_TITLE_INACTIVE}</strong>
           <span>{HOLDER_ACCESS_SUMMARY}</span>
         </li>
         <li>

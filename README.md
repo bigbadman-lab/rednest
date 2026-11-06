@@ -27,9 +27,9 @@ Confirmed in this codebase and available on the hosted product unless noted:
 | Solana wallet connect + server-side ownership verification (Settings) | Implemented |
 | Self-hosting via Docker | Implemented (see [docker/README.md](docker/README.md)) |
 | Lifetime free scan entitlement (one per GitHub account) | Implemented |
-| $NEST holder eligibility (≥ 50,000 tokens, 50 scans / UTC month) | Built in code; **not active** until official token launch |
+| $NEST holder eligibility (≥ 50,000 tokens, 50 scans / UTC month) | **Active** for eligible verified wallets |
 
-Do not treat holder scanning or a live token mint as production features yet. Billing modules from the upstream project may still appear in docs while hosted access evolves.
+Billing modules from the upstream project may still appear in code paths for accounts that use them; public hosted access uses the free-scan + $NEST holder model.
 
 ## Getting started
 
@@ -48,8 +48,8 @@ See [Use it from your agent](https://rednest.tech/docs/agents) for MCP and HTTP 
 ## Access and scan allowances
 
 - **One lifetime free scan** per GitHub account.
-- **Planned $NEST holder access:** at least **50,000** $NEST in a verified Solana wallet, with **50** holder scans per UTC month after activation.
-- **Holder scanning is not active yet.** There is no launched token mint in production configuration. Missing or disabled holder settings keep that path fail-closed; GitHub sign-in and the free scan continue to work.
+- **$NEST holder access:** at least **50,000** $NEST in a verified Solana wallet, with **50** holder scans per UTC month.
+- **Holder scanning is active** for eligible verified wallets. Missing mint or a disabled holder-scan flag keeps that path fail-closed; GitHub sign-in and the free scan continue to work.
 
 ## Technology
 
@@ -91,7 +91,7 @@ Required categories of configuration (see `.env.example`; leave empty in docs an
 - GitHub App credentials
 - LLM endpoint (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, optional per-role models)
 
-Optional holder-related variables (`RED_HOLDER_SCANS_ENABLED`, `RED_TOKEN_MINT`, `RED_MINT_PUBLIC`, `SOLANA_RPC_URL`, `NEXT_PUBLIC_REOWN_PROJECT_ID`) must stay unset or disabled until an official launch. Homepage mint display also requires `RED_MINT_PUBLIC=true` and never enables holder scans by itself.
+Holder-related variables (`RED_HOLDER_SCANS_ENABLED`, `RED_TOKEN_MINT`, `RED_MINT_PUBLIC`, `SOLANA_RPC_URL`, `NEXT_PUBLIC_REOWN_PROJECT_ID`) enable $NEST holder access in production. Homepage mint display requires `RED_MINT_PUBLIC=true` and never enables holder scans by itself; missing mint or a disabled holder-scan flag keeps that path fail-closed.
 
 ## Security
 

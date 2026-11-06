@@ -17,7 +17,7 @@ import { site, siteUrl } from "@/lib/site";
 const base = "https://sandchest.example";
 const pages = [
   { url: "/docs", title: "Getting started", description: "Install it." },
-  { url: "/docs/pricing", title: "Pricing & $NEST access", description: "Free scan and planned $NEST holder access." },
+  { url: "/docs/pricing", title: "Pricing & $NEST access", description: "Free scan and $NEST holder access." },
 ];
 
 describe("Markdown URLs", () => {
@@ -50,7 +50,7 @@ describe("page Markdown", () => {
   test("starts with the title and summary, and makes site links absolute", () => {
     const markdown = renderPageMarkdown(pages[1]!, `\n${body}\n`, base, false);
     expect(markdown).toBe(
-      `# Pricing & $NEST access\n\n> Free scan and planned $NEST holder access.\n\nSee [pricing](${base}/docs/pricing#top-ups), [GitHub](https://github.com), [protocol-relative](//cdn.example) and [the policy](${base}/privacy#contact).\n`,
+      `# Pricing & $NEST access\n\n> Free scan and $NEST holder access.\n\nSee [pricing](${base}/docs/pricing#top-ups), [GitHub](https://github.com), [protocol-relative](//cdn.example) and [the policy](${base}/privacy#contact).\n`,
     );
   });
 

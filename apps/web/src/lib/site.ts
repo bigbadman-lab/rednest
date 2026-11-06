@@ -13,7 +13,7 @@ export const site = {
   name: "RedNest",
   title: "RedNest — Autonomous AI code security scanning",
   description:
-    "AI-powered security scanning for GitHub repositories. One free lifetime scan, then planned $NEST holder access—no recurring fiat subscription for holder scans.",
+    "AI-powered security scanning for GitHub repositories. One free lifetime scan, then $NEST holder access for eligible wallets—no recurring fiat subscription for holder scans.",
   url: siteUrl() ?? "http://localhost:3000",
   githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/apps/rednestai",
   /** Official X (Twitter) account. */
