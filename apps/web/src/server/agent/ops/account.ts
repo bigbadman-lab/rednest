@@ -138,7 +138,7 @@ function appendRedNestAccessSteps(access: AccessSnapshot, appUrl: string, steps:
   if (!access.holder_access_active || access.holder_status === "not_activated" || access.holder_status === "unavailable") {
     steps.push({
       step: "holder_access_inactive",
-      do: "The lifetime free scan is used. $RED holder scanning is not active yet, so further chargeable scans are not available. Do not ask for payment or credits. Optional: the person can verify a Solana wallet in Settings ahead of launch.",
+      do: "The lifetime free scan is used. $NEST holder scanning is not active yet, so further chargeable scans are not available. Do not ask for payment or credits. Optional: the person can verify a Solana wallet in Settings ahead of launch.",
       url: walletUrl,
     });
     return;
@@ -147,7 +147,7 @@ function appendRedNestAccessSteps(access: AccessSnapshot, appUrl: string, steps:
   if (access.holder_status === "no_wallet") {
     steps.push({
       step: "connect_wallet",
-      do: "The lifetime free scan is used. Ask the person to connect and verify a Solana wallet holding at least 50,000 $RED under Settings, then call get_me again.",
+      do: "The lifetime free scan is used. Ask the person to connect and verify a Solana wallet holding at least 50,000 $NEST under Settings, then call get_me again.",
       url: walletUrl,
     });
     return;
@@ -156,7 +156,7 @@ function appendRedNestAccessSteps(access: AccessSnapshot, appUrl: string, steps:
   if (access.holder_status === "insufficient_balance") {
     steps.push({
       step: "insufficient_red",
-      do: "A verified wallet is connected but needs at least 50,000 $RED for more scans this month. Tell the person; do not start chargeable scans until get_me shows holder eligibility.",
+      do: "A verified wallet is connected but needs at least 50,000 $NEST for more scans this month. Tell the person; do not start chargeable scans until get_me shows holder eligibility.",
       url: pricingUrl,
     });
     return;
@@ -224,7 +224,7 @@ export const accountOps = [
     name: "get_me",
     title: "Who am I, and what's next",
     description:
-      "Start here. Returns the person this agent acts as, the GitHub accounts RedNest is installed on, scan access (lifetime free scan, wallet, $RED holder state), and `next_steps`: what is left to set up or do, in order (install the GitHub App, run a free scan, connect a wallet after launch, fix open findings). Steps only a person can take come with a URL to give them.",
+      "Start here. Returns the person this agent acts as, the GitHub accounts RedNest is installed on, scan access (lifetime free scan, wallet, $NEST holder state), and `next_steps`: what is left to set up or do, in order (install the GitHub App, run a free scan, connect a wallet after launch, fix open findings). Steps only a person can take come with a URL to give them.",
     method: "GET",
     path: "/me",
     input: z.object({}),

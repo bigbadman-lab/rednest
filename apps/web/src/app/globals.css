@@ -845,7 +845,7 @@ html:has(.page) {
   background: var(--color-gold);
 }
 
-/* Homepage $RED access + official mint panel */
+/* Homepage $NEST access + official mint panel */
 
 .red-access-points {
   display: grid;

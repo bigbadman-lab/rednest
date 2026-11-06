@@ -1,4 +1,4 @@
-/** Hard-locked production target for the $RED launch CLI. */
+/** Hard-locked production target for the $NEST launch CLI. */
 
 export const LAUNCH_TEAM = "cope2";
 export const LAUNCH_PROJECT = "rednest";

@@ -89,12 +89,12 @@ describe("readRedMintDisplay", () => {
 describe("RedAccessSectionView", () => {
   test("shows free allowance and pre-launch holder messaging without a mint", () => {
     const html = renderToStaticMarkup(<RedAccessSectionView published={false} holdersActive={false} />);
-    expect(html).toContain("Powered by $RED.");
+    expect(html).toContain("Powered by $NEST.");
     expect(html).toContain(FREE_ACCESS_SUMMARY);
     expect(html).toContain(HOLDER_ACCESS_SUMMARY);
-    expect(html).toContain("50,000 $RED");
+    expect(html).toContain("50,000 $NEST");
     expect(html).toContain("50 scans per UTC month");
-    expect(html).toContain("$RED holder access — coming soon");
+    expect(html).toContain("$NEST holder access — coming soon");
     expect(html).toContain(HOLDER_STATUS_INACTIVE);
     expect(html).toContain(MINT_COMING_SOON);
     expect(html).not.toContain('data-testid="red-mint-address"');
@@ -111,7 +111,7 @@ describe("RedAccessSectionView", () => {
         holdersActive={false}
       />,
     );
-    expect(html).toContain("Official $RED mint");
+    expect(html).toContain("Official $NEST mint");
     expect(html).toContain(SAMPLE_MINT);
     expect(html).toContain(`href="https://solscan.io/token/${SAMPLE_MINT}"`);
     expect(html).toContain("Copy address");

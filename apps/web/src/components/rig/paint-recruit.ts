@@ -231,7 +231,7 @@ function contract(kit: Kit, t: number, since: number, m: RecruitModel) {
     section("TERMS", [
       "One lifetime free security scan after GitHub sign-in.",
       "No payment details required.",
-      "After $RED launches, eligible holders unlock additional monthly scans.",
+      "After $NEST launches, eligible holders unlock additional monthly scans.",
     ]);
   } else if (!m.currentPlan && m.claim) {
     const first = m.repos.find((repo) => repo.id === m.target);

@@ -29,7 +29,7 @@ export function LandingPage({ visitor }: { visitor: Visitor }) {
           <p className="hero-lede">
             Secure your entire codebase with AI-powered Deep Scans, automated GitHub PR reviews and
             actionable fixes through Claude Code, Cursor, Codex or any MCP-connected agent. Powered
-            by $RED, with 50,000 tokens unlocking 50 monthly Deep Scans and organization-wide
+            by $NEST, with 50,000 tokens unlocking 50 monthly Deep Scans and organization-wide
             security coverage.
           </p>
           <div className="hero-actions">

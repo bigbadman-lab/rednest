@@ -124,11 +124,11 @@ export const scanOps = [
             throw new ApiError(422, "too_large", "This repository is over a million lines of code, too large for a deep scan.");
           case "holder_inactive":
           case "free_used":
-            throw new ApiError(402, "holder_inactive", "Your free scan is used. $RED holder access is not available yet.");
+            throw new ApiError(402, "holder_inactive", "Your free scan is used. $NEST holder access is not available yet.");
           case "wallet_required":
-            throw new ApiError(402, "wallet_required", "Connect a verified wallet holding at least 50,000 $RED to keep scanning.");
+            throw new ApiError(402, "wallet_required", "Connect a verified wallet holding at least 50,000 $NEST to keep scanning.");
           case "insufficient_red":
-            throw new ApiError(402, "insufficient_red", "This wallet needs at least 50,000 $RED for more scans this month.");
+            throw new ApiError(402, "insufficient_red", "This wallet needs at least 50,000 $NEST for more scans this month.");
           case "quota_exhausted":
             throw new ApiError(402, "quota_exhausted", "You have used all 50 holder scans for this UTC month.");
           case "auth_required":

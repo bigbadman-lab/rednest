@@ -17,7 +17,7 @@ export function ensureWalletAppKit(): boolean {
 
   const metadata = {
     name: "RedNest",
-    description: "Verify a Solana wallet for $RED holder scans",
+    description: "Verify a Solana wallet for $NEST holder scans",
     url: window.location.origin,
     icons: [`${window.location.origin}/red.png`],
   };

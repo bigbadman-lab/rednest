@@ -27,7 +27,7 @@ export function createSiteClient(fetchImpl: typeof fetch = fetch): SiteClient {
 }
 
 export function homepageShowsMint(html: string, mint: string): boolean {
-  return html.includes(mint) && /Official \$RED mint/i.test(html);
+  return html.includes(mint) && /Official \$NEST mint/i.test(html);
 }
 
 export function homepageHidesMint(html: string): boolean {
@@ -37,7 +37,7 @@ export function homepageHidesMint(html: string): boolean {
 export function homepageHolderInactive(html: string): boolean {
   return (
     /Token-holder scanning is not active yet/i.test(html) ||
-    /\$RED has not launched yet/i.test(html) ||
+    /\$NEST has not launched yet/i.test(html) ||
     /token has not launched/i.test(html)
   );
 }

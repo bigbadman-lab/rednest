@@ -69,11 +69,11 @@ function messageFor(reason: string, detail?: string): string {
     case "unavailable":
       return detail ?? "This repository can’t be scanned right now.";
     case "holder_inactive":
-      return "Your free scan is used. Additional scans will require an eligible wallet holding 50,000 $RED once holder access launches.";
+      return "Your free scan is used. Additional scans will require an eligible wallet holding 50,000 $NEST once holder access launches.";
     case "wallet_required":
-      return "Connect a verified wallet holding at least 50,000 $RED to keep scanning.";
+      return "Connect a verified wallet holding at least 50,000 $NEST to keep scanning.";
     case "insufficient_red":
-      return "This wallet needs at least 50,000 $RED for more scans this month.";
+      return "This wallet needs at least 50,000 $NEST for more scans this month.";
     case "quota_exhausted":
       return "You have used all 50 holder scans for this UTC month.";
     case "free_used":

@@ -34,7 +34,7 @@ target/
 .sandchest/
 tmp/
 
-# Local $RED launch verification receipts (no secrets, still operator-local)
+# Local $NEST launch verification receipts (no secrets, still operator-local)
 .red-launch/
 
 # OS / editor

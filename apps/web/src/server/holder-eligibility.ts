@@ -1,5 +1,5 @@
 /**
- * Production holder eligibility for $RED. Fail-closed until launch config is
+ * Production holder eligibility for $NEST. Fail-closed until launch config is
  * complete and a verified wallet holds enough tokens. Never trusts the client.
  */
 import { getActiveWallet } from "@sandchest/db";

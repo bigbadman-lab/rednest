@@ -27,7 +27,7 @@ Confirmed in this codebase and available on the hosted product unless noted:
 | Solana wallet connect + server-side ownership verification (Settings) | Implemented |
 | Self-hosting via Docker | Implemented (see [docker/README.md](docker/README.md)) |
 | Lifetime free scan entitlement (one per GitHub account) | Implemented |
-| $RED holder eligibility (≥ 50,000 tokens, 50 scans / UTC month) | Built in code; **not active** until official token launch |
+| $NEST holder eligibility (≥ 50,000 tokens, 50 scans / UTC month) | Built in code; **not active** until official token launch |
 
 Do not treat holder scanning or a live token mint as production features yet. Billing modules from the upstream project may still appear in docs while hosted access evolves.
 
@@ -48,7 +48,7 @@ See [Use it from your agent](https://rednest.tech/docs/agents) for MCP and HTTP 
 ## Access and scan allowances
 
 - **One lifetime free scan** per GitHub account.
-- **Planned $RED holder access:** at least **50,000** $RED in a verified Solana wallet, with **50** holder scans per UTC month after activation.
+- **Planned $NEST holder access:** at least **50,000** $NEST in a verified Solana wallet, with **50** holder scans per UTC month after activation.
 - **Holder scanning is not active yet.** There is no launched token mint in production configuration. Missing or disabled holder settings keep that path fail-closed; GitHub sign-in and the free scan continue to work.
 
 ## Technology

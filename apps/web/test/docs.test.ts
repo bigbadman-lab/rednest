@@ -1,6 +1,6 @@
 /**
  * Docs and legal pages: structure, internal links, and public pricing copy
- * that must match the RedNest free-scan + planned $RED holder model.
+ * that must match the RedNest free-scan + planned $NEST holder model.
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -15,16 +15,16 @@ const read = (file: string) => readFileSync(file, "utf8");
 const mdx = (dir: string) => readdirSync(dir).filter((file) => file.endsWith(".mdx"));
 const doc = (name: string) => read(join(docsDir, `${name}.mdx`));
 
-describe("pricing matches the $RED access model", () => {
+describe("pricing matches the $NEST access model", () => {
   const pricing = doc("pricing");
 
   test("free and holder offerings", () => {
     expect(pricing).toContain("## Start scanning for free");
     expect(pricing).toContain("1 lifetime scan per authenticated GitHub account");
     expect(pricing).toContain("[Start Free Scan](/dashboard/scans)");
-    expect(pricing).toContain("## Security scanning powered by $RED");
+    expect(pricing).toContain("## Security scanning powered by $NEST");
     expect(pricing).toContain("50 scans per UTC month");
-    expect(pricing).toContain("50,000 $RED");
+    expect(pricing).toContain("50,000 $NEST");
     expect(pricing).toContain("[Connect Wallet](/dashboard/settings#wallet)");
     expect(pricing).toContain("Token-holder scanning is not active yet");
     expect(pricing).toContain("No official mint is configured");
@@ -183,6 +183,6 @@ describe("what the pages must never say", () => {
 
   test("public pricing does not claim the token has launched", () => {
     expect(doc("pricing")).toContain("not active yet");
-    expect(doc("pricing")).not.toMatch(/\blaunched\b.*\$RED|\$RED is (live|tradable|available to buy)/i);
+    expect(doc("pricing")).not.toMatch(/\blaunched\b.*\$NEST|\$NEST is (live|tradable|available to buy)/i);
   });
 });

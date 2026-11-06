@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Operator CLI for $RED production launch configuration.
+ * Operator CLI for $NEST production launch configuration.
  * Does not create tokens. Pump.fun remains the token creation platform.
  *
  *   bun run red:launch status

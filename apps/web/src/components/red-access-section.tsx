@@ -16,7 +16,7 @@ export function RedAccessSectionFallback() {
 }
 
 /**
- * Homepage $RED access block. Reads runtime env so build-time prerenders never
+ * Homepage $NEST access block. Reads runtime env so build-time prerenders never
  * invent a mint; awaits connection() so deploy-time settings apply.
  */
 export async function RedAccessSection() {
@@ -46,7 +46,7 @@ export function RedAccessSectionView({
   return (
     <section className="section red-access" aria-labelledby="red-access-title" data-testid="red-access-section">
       <h2 id="red-access-title" className="section-title">
-        Powered by $RED.
+        Powered by $NEST.
       </h2>
       <p className="pitch-body">RedNest connects AI-powered repository security with Solana token-based access.</p>
 
@@ -56,7 +56,7 @@ export function RedAccessSectionView({
           <span>{FREE_ACCESS_SUMMARY}</span>
         </li>
         <li>
-          <strong>$RED holder access — coming soon</strong>
+          <strong>$NEST holder access — coming soon</strong>
           <span>{HOLDER_ACCESS_SUMMARY}</span>
         </li>
         <li>

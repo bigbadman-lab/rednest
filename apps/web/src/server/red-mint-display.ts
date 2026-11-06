@@ -1,5 +1,5 @@
 /**
- * Public $RED mint display rules.
+ * Public $NEST mint display rules.
  *
  * Canonical mint remains `RED_TOKEN_MINT` (also used by holder eligibility).
  * Publication to the marketing surface is a separate flag so registering a mint

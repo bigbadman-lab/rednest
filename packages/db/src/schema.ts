@@ -552,7 +552,7 @@ export const userEntitlements = pgTable("user_entitlements", {
   updatedAt: updatedAt(),
 });
 
-/** UTC calendar month usage for $RED holders (YYYY-MM). */
+/** UTC calendar month usage for $NEST holders (YYYY-MM). */
 export const userScanMonths = pgTable(
   "user_scan_months",
   {

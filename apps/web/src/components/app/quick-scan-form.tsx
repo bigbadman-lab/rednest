@@ -30,7 +30,7 @@ export function QuickScanForm({ freeAvailable }: { freeAvailable: boolean }) {
         <p className="field-help">
           {freeAvailable
             ? "Your free lifetime scan is available. No GitHub App install required for public repos."
-            : "Your free scan is used. Additional scans will require an eligible wallet holding 50,000 $RED once holder access launches."}
+            : "Your free scan is used. Additional scans will require an eligible wallet holding 50,000 $NEST once holder access launches."}
         </p>
       </div>
       {state.error && (

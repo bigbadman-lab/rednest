@@ -1,5 +1,5 @@
 /**
- * Server-only $RED SPL balance check. Fail-closed: any RPC or parse ambiguity
+ * Server-only $NEST SPL balance check. Fail-closed: any RPC or parse ambiguity
  * yields insufficient/unavailable rather than eligibility.
  *
  * Enumerates every token account owned by the wallet for the canonical mint

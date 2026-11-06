@@ -59,17 +59,17 @@ export function WalletSettings(props: WalletSettingsProps) {
         <h2 id="wallet-title" className="account-name">
           Solana wallet
         </h2>
-        <p className="account-role">Optional — for $RED holder scans after launch</p>
+        <p className="account-role">Optional — for $NEST holder scans after launch</p>
       </div>
       <div className="settings-form">
         <div>
           <p className="field-legend">Holder requirement</p>
           <p className="field-help">
-            After launch, chargeable scans beyond your free lifetime scan need a verified wallet holding at least 50,000 $RED.
+            After launch, chargeable scans beyond your free lifetime scan need a verified wallet holding at least 50,000 $NEST.
             Allowance: {props.monthlyAllowance} holder scans per UTC month. GitHub remains your RedNest identity.
           </p>
           {!props.holderLaunchActive && (
-            <p className="field-help">$RED holder scanning is not active yet.</p>
+            <p className="field-help">$NEST holder scanning is not active yet.</p>
           )}
         </div>
 

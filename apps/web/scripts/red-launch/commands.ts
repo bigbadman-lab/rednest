@@ -91,7 +91,7 @@ export async function cmdStatus(deps: LaunchDeps): Promise<CommandResult> {
   else if (mintCanon) mintLabel = `configured (${mintCanon})`;
   else mintLabel = "configured (invalid pubkey)";
 
-  deps.io.log("Production $RED launch status");
+  deps.io.log("Production $NEST launch status");
   deps.io.log(`  RED_TOKEN_MINT: ${mintLabel}`);
   deps.io.log(`  RED_MINT_PUBLIC: ${describeFlag(env, "RED_MINT_PUBLIC")}`);
   deps.io.log(`  RED_HOLDER_SCANS_ENABLED: ${describeFlag(env, "RED_HOLDER_SCANS_ENABLED")}`);

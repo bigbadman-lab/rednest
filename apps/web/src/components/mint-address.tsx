@@ -18,7 +18,7 @@ export function MintAddress({ mint, solscanUrl }: { mint: string; solscanUrl: st
 
   return (
     <div className="red-mint">
-      <p className="red-mint-label">Official $RED mint</p>
+      <p className="red-mint-label">Official $NEST mint</p>
       <code className="red-mint-address" data-testid="red-mint-address">
         {mint}
       </code>

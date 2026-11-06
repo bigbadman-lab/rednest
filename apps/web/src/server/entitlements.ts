@@ -39,7 +39,7 @@ export class EntitlementError extends Error {
   }
 }
 
-/** Holder check for $RED. Fail-closed until launch env enables a verified mint. */
+/** Holder check for $NEST. Fail-closed until launch env enables a verified mint. */
 export type HolderStatus = "eligible" | "no_wallet" | "insufficient_balance" | "not_activated" | "unavailable";
 
 export type HolderEligibilityProvider = (userId: string) => Promise<HolderStatus> | HolderStatus;
@@ -66,10 +66,10 @@ function mapReserveFailure(reason: Extract<ReserveOutcome, { ok: false }>["reaso
     case "free_used":
     case "holder_required":
       if (holder === "not_activated" || holder === "unavailable") {
-        return new EntitlementError("holder_inactive", "Your free scan is used. $RED holder access is not available yet.");
+        return new EntitlementError("holder_inactive", "Your free scan is used. $NEST holder access is not available yet.");
       }
-      if (holder === "no_wallet") return new EntitlementError("wallet_required", "Connect and verify a Solana wallet that holds at least 50,000 $RED.");
-      if (holder === "insufficient_balance") return new EntitlementError("insufficient_red", "This wallet needs at least 50,000 $RED for more scans this month.");
+      if (holder === "no_wallet") return new EntitlementError("wallet_required", "Connect and verify a Solana wallet that holds at least 50,000 $NEST.");
+      if (holder === "insufficient_balance") return new EntitlementError("insufficient_red", "This wallet needs at least 50,000 $NEST for more scans this month.");
       return new EntitlementError("free_used", "Your free lifetime scan has already been used.");
     case "quota_exhausted":
       return new EntitlementError("quota_exhausted", "You have used all 50 holder scans for this UTC month.");

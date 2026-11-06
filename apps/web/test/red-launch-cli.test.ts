@@ -182,7 +182,7 @@ function createHarness(init: {
     pump: {
       async lookupCoin() {
         if (init.pumpOk === false) return { ok: false, reason: "not_found_on_pump_fun" };
-        return { ok: true, name: "RED", symbol: "RED" };
+        return { ok: true, name: "NEST", symbol: "NEST" };
       },
     },
     site: {
@@ -817,7 +817,7 @@ describe("publish", () => {
     const mint = await sampleMint();
     const h = createHarness({
       env: { RED_TOKEN_MINT: mint, SOLANA_RPC_URL: "https://rpc.test", RED_MINT_PUBLIC: null, RED_HOLDER_SCANS_ENABLED: "false" },
-      homepage: `Official $RED mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet. $RED has not launched yet`,
+      homepage: `Official $NEST mint ${mint} https://solscan.io/token/${mint} Token-holder scanning is not active yet. $NEST has not launched yet`,
     });
     const result = await cmdPublish(h.deps, { dryRun: false, yes: true });
     expect(result.ok).toBe(true);
@@ -830,7 +830,7 @@ describe("publish", () => {
     const h = createHarness({
       env: { RED_TOKEN_MINT: mint, SOLANA_RPC_URL: "https://rpc.test", RED_MINT_PUBLIC: null, RED_HOLDER_SCANS_ENABLED: null },
       mintOnChain: { error: "account_absent" },
-      homepage: `Official $RED mint ${mint} https://solscan.io/token/${mint} This mint address is reserved. $RED has not launched yet — holder scanning stays disabled until activation. Token-holder scanning is not active yet.`,
+      homepage: `Official $NEST mint ${mint} https://solscan.io/token/${mint} This mint address is reserved. $NEST has not launched yet — holder scanning stays disabled until activation. Token-holder scanning is not active yet.`,
     });
     const result = await cmdPublish(h.deps, { dryRun: false, yes: true });
     expect(result.ok).toBe(true);
